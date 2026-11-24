@@ -26,7 +26,7 @@ class PricingService
     /**
      * @return array<string, mixed>
      */
-    public function estimate(Station $station, Charger $charger, string $batteryKwh, int $from, int $to, int $durationMinutes, ?CarbonInterface $at = null, ?\App\Models\Coupon $coupon = null): array
+    public function estimate(Station $station, Charger $charger, string $batteryKwh, int $from, int $to, int $durationMinutes, ?CarbonInterface $at = null, ?\App\Models\Coupon $coupon = null, ?string $actualKwh = null): array
     {
         $tariff = $this->tariffFor($station, $charger, $at);
 
@@ -35,6 +35,11 @@ class PricingService
         // Energy the charger can deliver in the slot.
         $deliverable = bcmul(bcmul((string) $charger->power_kw, (string) \App\Support\BusinessRules::get('pricing.power_utilisation'), 6), bcdiv((string) $durationMinutes, '60', 6), 6);
         $kwh = bccomp($needed, $deliverable, 6) <= 0 ? $needed : $deliverable;
+        // Walk-in bills use the energy actually delivered.
+        if ($actualKwh !== null) {
+            $kwh = $actualKwh;
+            $needed = $deliverable = $actualKwh;
+        }
         $kwh = GstService::round($kwh, 3);
 
         // Energy is shared across the slot's time bands (peak / off-peak) in proportion to the minutes in each.

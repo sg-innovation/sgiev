@@ -25,7 +25,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'coupons.view', 'coupons.manage',
         'invoices.export', 'cancellation.manage', 'wallet.view', 'wallet.recharge',
         'tickets.view', 'tickets.reply', 'tickets.assign', 'tickets.manage',
-        'reconciliation.view', 'sessions.manage',
+        'reconciliation.view', 'sessions.manage', 'walkins.manage',
         // Platform-only (effective for Trans EV staff only; see PLATFORM_ONLY)
         'platform.all_companies', 'partners.review', 'plans.manage', 'integrations.manage', 'roles.manage', 'customers.block',
         'settings.manage', 'content.manage', 'lookups.manage', 'platform_fees.manage', 'reconciliation.manage',
@@ -34,7 +34,7 @@ class RolesAndPermissionsSeeder extends Seeder
     /** Initial labels and grouping stored with each permission (editable data, shown on Roles & permissions). */
     public const GROUPS = [
         'stations' => 'Stations', 'tariffs' => 'Tariffs & pricing', 'rules' => 'Station rules', 'bookings' => 'Bookings & customers',
-        'payments' => 'Payments & refunds', 'coupons' => 'Coupons & offers', 'invoices' => 'Invoices & GST', 'cancellation' => 'Cancellation policies', 'wallet' => 'Trans EV wallet', 'tickets' => 'Support tickets', 'sessions' => 'Charging sessions', 'reconciliation' => 'Reconciliation',
+        'payments' => 'Payments & refunds', 'coupons' => 'Coupons & offers', 'invoices' => 'Invoices & GST', 'cancellation' => 'Cancellation policies', 'wallet' => 'Trans EV wallet', 'tickets' => 'Support tickets', 'sessions' => 'Charging sessions', 'walkins' => 'Walk-ins', 'reconciliation' => 'Reconciliation',
         'company' => 'Company profile', 'users' => 'Staff', 'support' => 'Contact-form queries', 'blog' => 'Blog', 'audit' => 'Audit log',
         'platform' => 'Platform access', 'partners' => 'Partner review', 'plans' => 'Plans', 'integrations' => 'Integrations',
         'roles' => 'Roles', 'customers' => 'Customers', 'settings' => 'Business rules', 'content' => 'Website pages', 'lookups' => 'Lists & options', 'platform_fees' => 'Platform fees',
@@ -60,6 +60,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'audit.view' => 'Read the audit log',
         'reconciliation.view' => 'See reconciliation exceptions for their company',
         'sessions.manage' => 'Start and stop charging sessions (Staff Console)',
+        'walkins.manage' => 'Start walk-in charging and take payment at the station (cash, UPI, payment link)',
         'reconciliation.manage' => 'Run reconciliation, fix, assign and resolve exceptions',
         'platform.all_companies' => 'See every company’s data (not just Trans EV)',
         'partners.review' => 'Approve partners, verify KYC, approve stations, suspend companies',
@@ -105,17 +106,17 @@ class RolesAndPermissionsSeeder extends Seeder
                 'company.view', 'company.manage', 'users.view', 'users.manage',
                 'bookings.view', 'bookings.manage', 'blog.view', 'blog.manage', 'blog.publish',
                 'support.view', 'support.manage', 'audit.view', 'payments.view', 'payments.refund',
-                'coupons.view', 'coupons.manage', 'invoices.export', 'cancellation.manage', 'wallet.view', 'wallet.recharge', 'tickets.view', 'tickets.reply', 'tickets.assign', 'tickets.manage', 'reconciliation.view', 'sessions.manage',
+                'coupons.view', 'coupons.manage', 'invoices.export', 'cancellation.manage', 'wallet.view', 'wallet.recharge', 'tickets.view', 'tickets.reply', 'tickets.assign', 'tickets.manage', 'reconciliation.view', 'sessions.manage', 'walkins.manage',
             ],
             RoleEnum::OperationsAdmin->value => [
                 'stations.view', 'stations.manage', 'stations.status', 'stations.hours',
                 'tariffs.view', 'rules.view', 'rules.manage', 'company.view',
                 'bookings.view', 'bookings.manage', 'blog.view', 'blog.manage', 'blog.publish',
                 'support.view', 'support.manage', 'payments.view', 'coupons.view', 'coupons.manage', 'cancellation.manage',
-                'tickets.view', 'tickets.reply', 'tickets.assign', 'sessions.manage',
+                'tickets.view', 'tickets.reply', 'tickets.assign', 'sessions.manage', 'walkins.manage',
             ],
             RoleEnum::Finance->value => ['stations.view', 'tariffs.view', 'tariffs.manage', 'company.view', 'bookings.view', 'support.view', 'audit.view', 'payments.view', 'payments.refund', 'coupons.view', 'invoices.export', 'wallet.view', 'wallet.recharge', 'tickets.view', 'tickets.reply', 'reconciliation.view'],
-            RoleEnum::StationManager->value => ['stations.view', 'stations.status', 'stations.hours', 'tariffs.view', 'rules.view', 'bookings.view', 'bookings.manage', 'tickets.view', 'tickets.reply', 'sessions.manage'],
+            RoleEnum::StationManager->value => ['stations.view', 'stations.status', 'stations.hours', 'tariffs.view', 'rules.view', 'bookings.view', 'bookings.manage', 'tickets.view', 'tickets.reply', 'sessions.manage', 'walkins.manage'],
             RoleEnum::Auditor->value => ['stations.view', 'tariffs.view', 'rules.view', 'company.view', 'users.view', 'bookings.view', 'blog.view', 'support.view', 'audit.view', 'payments.view', 'coupons.view', 'tickets.view', 'reconciliation.view'],
             RoleEnum::Customer->value => [],
         ];

@@ -107,6 +107,9 @@ class RefundService
         return DB::transaction(function () use ($payment, $amount, $reason, $rule, $by, $retained) {
             /** @var Payment $p */
             $p = Payment::query()->whereKey($payment->id)->lockForUpdate()->first();
+            if (array_key_exists($p->gateway, \App\Services\WalkInService::OFFLINE)) {
+                throw ValidationException::withMessages(['amount' => 'This was paid at the station ('.\App\Services\WalkInService::OFFLINE[$p->gateway].'). Refund it at the station and record a note.']);
+            }
             $available = bcsub((string) ($p->paid_amount ?? $p->amount), $p->refundedAmount(), 2);
             if ($p->status !== Payment::SUCCESS || bccomp($amount, '0', 2) <= 0 || bccomp($amount, $available, 2) > 0) {
                 throw ValidationException::withMessages(['amount' => "Refund must be between ₹0.01 and ₹{$available}."]);

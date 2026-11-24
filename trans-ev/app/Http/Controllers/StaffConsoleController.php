@@ -34,7 +34,7 @@ class StaffConsoleController extends Controller
 
     public static function canUse(?User $user): bool
     {
-        return $user !== null && $user->isStaff() && ($user->can('bookings.manage') || $user->can('sessions.manage') || $user->can('stations.status'));
+        return $user !== null && $user->isStaff() && ($user->can('bookings.manage') || $user->can('sessions.manage') || $user->can('stations.status') || $user->can('walkins.manage'));
     }
 
     public function index(Request $request): Response
@@ -50,11 +50,67 @@ class StaffConsoleController extends Controller
             'today' => now(Station::TIMEZONE)->format('l, j M'),
             'arrivals' => $station ? $this->arrivals($station, $user) : [],
             'chargers' => $station ? $this->chargers($station) : [],
-            'can' => ['checkIn' => $user->can('bookings.manage'), 'sessions' => $user->can('sessions.manage'), 'status' => $user->can('stations.status')],
+            'can' => ['checkIn' => $user->can('bookings.manage'), 'sessions' => $user->can('sessions.manage'), 'status' => $user->can('stations.status'),
+                'walkIns' => $user->can('walkins.manage') && $user->can('sessions.manage')],
+            'walkIn' => $station && $user->can('walkins.manage') ? $this->walkInOptions($station) : null,
             'stopReasons' => ChargingSession::STOP_REASONS,
             'manualStatuses' => collect(self::MANUAL_STATUSES)->mapWithKeys(fn ($s) => [$s => ConnectorLiveStatus::from($s)->getLabel()]),
             'noShowMinutes' => BusinessRules::int('booking.no_show_minutes'),
         ]);
+    }
+
+    public function walkIn(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'connector_id' => ['required', 'integer'], 'registration_no' => ['required', 'string', 'max:15', 'regex:/^[A-Za-z0-9 \-]{4,15}$/'],
+            'make' => ['nullable', 'string', 'max:40'], 'model' => ['nullable', 'string', 'max:60'],
+            'name' => ['required', 'string', 'max:80'], 'phone' => ['required', 'regex:/^[6-9][0-9]{9}$/'], 'email' => ['nullable', 'email', 'max:120'],
+            'gstin' => ['nullable', 'string', 'max:15'], 'minutes' => ['required', 'integer', 'min:10', 'max:720'],
+            'meter_start' => ['nullable', 'numeric', 'min:0', 'max:99999999'], 'informed' => ['accepted'],
+        ], [
+            'phone.regex' => 'Enter a 10-digit Indian mobile number.', 'informed.accepted' => 'Tell the driver the price and station rules first.',
+            'registration_no.regex' => 'Enter the number plate, e.g. MH12AB1234.',
+        ]);
+        $connector = Connector::query()->with('charger.station')->findOrFail($data['connector_id']);
+        $booking = app(\App\Services\WalkInService::class)->start($connector, $data, $request->user());
+
+        return back()->with('success', "Walk-in {$booking->code} started on {$connector->label()}.");
+    }
+
+    public function collect(Request $request, Booking $booking): RedirectResponse
+    {
+        $data = $request->validate(['method' => ['required', 'string'], 'reference' => ['nullable', 'string', 'max:30']]);
+        app(\App\Services\WalkInService::class)->collect($booking, $data['method'], $data['reference'] ?? null, $request->user());
+
+        return back()->with('success', '₹'.number_format((float) $booking->total_amount, 2)." received for {$booking->code}. GST invoice issued.");
+    }
+
+    public function paymentLink(Request $request, Booking $booking): \Illuminate\Http\JsonResponse
+    {
+        $url = app(\App\Services\WalkInService::class)->paymentLink($booking, $request->user());
+
+        return response()->json(['url' => $url, 'qr' => CheckInService::qrSvg($url)])->header('Cache-Control', 'no-store');
+    }
+
+    /** Free connectors and how long a walk-in may use each before the next online booking. */
+    private function walkInOptions(Station $station): array
+    {
+        $svc = app(\App\Services\WalkInService::class);
+        $tz = Station::TIMEZONE;
+        $busy = ChargingSession::query()->where('station_id', $station->id)->where('status', 'active')->pluck('connector_id')->all();
+        $connectors = Connector::query()->whereHas('charger', fn ($q) => $q->where('station_id', $station->id))->with('charger.station')->get()
+            ->filter(fn (Connector $c) => $c->status?->value === 'online' && ! $c->live_status?->isDown() && ! $c->live_status?->isBusy() && ! in_array($c->id, $busy, true))
+            ->map(fn (Connector $c) => [
+                'id' => $c->id, 'label' => $c->label(), 'type' => $c->type->value, 'powerKw' => (float) $c->powerKw(),
+                'maxMinutes' => $svc->maxMinutes($c), 'freeUntil' => $svc->freeUntil($c)?->timezone($tz)->format('g:i A'),
+                'price' => ($t = $station->currentTariff($c->charger->type->value, $c->charger_id))
+                    ? '₹'.rtrim(rtrim(number_format((float) $t->rate_per_kwh, 2), '0'), '.').'/kWh'.((float) $t->session_fee > 0 ? ' + ₹'.rtrim(rtrim(number_format((float) $t->session_fee, 2), '0'), '.').' session fee' : '').' + '.(float) $t->gst_rate.'% GST'
+                    : null,
+            ])->filter(fn ($c) => $c['maxMinutes'] >= 10)->values();
+
+        return [
+            'connectors' => $connectors, 'durations' => [30, 45, 60, 90, 120, 180],
+        ];
     }
 
     public function scan(Request $request): RedirectResponse
@@ -128,7 +184,7 @@ class StaffConsoleController extends Controller
         return Booking::query()->where('station_id', $station->id)
             ->whereBetween('start_at', [now($tz)->startOfDay()->utc(), now($tz)->endOfDay()->utc()])
             ->whereIn('status', [BookingStatus::Confirmed, BookingStatus::CheckedIn, BookingStatus::Completed, BookingStatus::NoShow])
-            ->with(['charger', 'connectorPoint.charger'])->orderBy('start_at')->get()
+            ->with(['charger', 'connectorPoint.charger', 'payments', 'invoice'])->orderBy('start_at')->get()
             ->map(function (Booking $b) use ($tz, $sessions, $noShow, $user) {
                 $s = $sessions->get($b->id);
 
@@ -142,6 +198,13 @@ class StaffConsoleController extends Controller
                     'batteryFrom' => $b->battery_from, 'batteryTo' => $b->battery_to, 'estKwh' => (float) $b->est_kwh,
                     'checkedInAt' => $b->checked_in_at?->timezone($tz)->format('g:i A'),
                     'blocker' => $b->status === BookingStatus::Confirmed ? $this->checkIns->blocker($b) : null,
+                    'source' => $b->source, 'settlement' => $b->settlement,
+                    'bill' => $b->source === 'walk_in' && $b->status === BookingStatus::Completed ? [
+                        'total' => (float) $b->total_amount, 'taxable' => (float) $b->taxable_amount, 'tax' => (float) $b->cgst_amount + (float) $b->sgst_amount + (float) $b->igst_amount,
+                        'lines' => collect($b->price_lines ?? [])->map(fn ($l) => ['label' => $l['label'], 'qty' => (float) $l['qty'], 'unit' => $l['unit'], 'amount' => (float) $l['amount']])->values(),
+                        'paidBy' => ($p = $b->payments->firstWhere('status', \App\Models\Payment::SUCCESS)) ? $p->payment_mode.($p->bank_rrn ? ' · '.$p->bank_rrn : '') : null,
+                        'invoiceUrl' => $b->invoice ? route('bookings.invoice', $b) : null,
+                    ] : null,
                     'canNoShow' => $b->status === BookingStatus::Confirmed && now()->gte($b->start_at->copy()->addMinutes($noShow)) && $user->can('staffCancel', $b),
                     'session' => $s ? [
                         'uuid' => $s->uuid, 'status' => $s->status, 'startedAt' => $s->started_at->timezone($tz)->format('g:i A'), 'startedIso' => $s->started_at->toIso8601String(),

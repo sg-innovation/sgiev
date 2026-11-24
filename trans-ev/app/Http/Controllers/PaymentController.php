@@ -46,6 +46,9 @@ class PaymentController extends Controller
             return redirect(\App\Filament\Pages\WalletPage::getUrl(panel: 'admin'))->with($level, $text);
         }
         $booking = $payment->booking;
+        if ($booking->source === 'walk_in') {
+            return redirect()->route('walk-in.paid', $payment->uuid);
+        }
 
         $message = match (true) {
             $payment->status === Payment::SUCCESS && $booking->status->value === 'confirmed' => ['success', 'Payment successful. Your booking is confirmed.'],

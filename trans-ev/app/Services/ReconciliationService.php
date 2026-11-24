@@ -166,7 +166,7 @@ class ReconciliationService
     /** Ask the gateway about settled payments of the last few days and compare status and amount. */
     private function checkGateway(?int $paymentId = null): void
     {
-        Payment::query()->whereIn('status', [Payment::SUCCESS, Payment::FAILED])->whereNotNull('merchant_txn_id')
+        Payment::query()->whereIn('status', [Payment::SUCCESS, Payment::FAILED])->whereNotNull('merchant_txn_id')->where('environment', '!=', 'offline')
             ->when($paymentId, fn ($q) => $q->whereKey($paymentId), fn ($q) => $q->where('created_at', '>=', now()->subDays(BusinessRules::int('reconciliation.window_days'))))
             ->orderBy('id')->limit(BusinessRules::int('reconciliation.max_enquiries'))
             ->get()->each(function (Payment $p) {

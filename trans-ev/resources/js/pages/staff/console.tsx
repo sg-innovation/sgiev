@@ -2,7 +2,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { cn } from '@/lib/utils';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
-    AlertTriangle, BatteryCharging, Camera, Car, CheckCircle2, Clock, LayoutDashboard, LoaderCircle, Phone, Play, PlugZap, QrCode, RefreshCw, Square, UserX, X, Zap,
+    AlertTriangle, Banknote, BatteryCharging, Camera, Car, CheckCircle2, Clock, FileText, LayoutDashboard, LoaderCircle, Phone, Play, PlugZap, Plus, QrCode, RefreshCw, Smartphone, Square, UserX, X, Zap,
 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 
@@ -11,6 +11,12 @@ interface Arrival {
     code: string; status: string; statusLabel: string; start: string; end: string; startIso: string; endIso: string;
     customer: string | null; phone: string | null; vehicle: string; registration: string | null; charger: string | null; connector: string | null;
     batteryFrom: number; batteryTo: number; estKwh: number; checkedInAt: string | null; blocker: string | null; canNoShow: boolean; session: Session | null;
+    source: string; settlement: string | null;
+    bill: { total: number; taxable: number; tax: number; lines: { label: string; qty: number; unit: string; amount: number }[]; paidBy: string | null; invoiceUrl: string | null } | null;
+}
+interface WalkInOptions {
+    connectors: { id: number; label: string; type: string; powerKw: number; maxMinutes: number; freeUntil: string | null; price: string | null }[];
+    durations: number[];
 }
 interface ConnectorRow {
     id: number; no: number; type: string; live: string | null; liveLabel: string | null; tone: string | null; enabled: boolean; note: string | null; since: string | null;
@@ -24,7 +30,8 @@ interface Props {
     today: string;
     arrivals: Arrival[];
     chargers: ChargerRow[];
-    can: { checkIn: boolean; sessions: boolean; status: boolean };
+    can: { checkIn: boolean; sessions: boolean; status: boolean; walkIns: boolean };
+    walkIn: WalkInOptions | null;
     stopReasons: Record<string, string>;
     manualStatuses: Record<string, string>;
     noShowMinutes: number;
@@ -60,12 +67,14 @@ export default function StaffConsole(props: Props) {
     const [startFor, setStartFor] = useState<Arrival | null>(null);
     const [stopFor, setStopFor] = useState<{ uuid: string; label: string; meterStart: number | null; startedIso: string } | null>(null);
     const [statusFor, setStatusFor] = useState<ConnectorRow | null>(null);
+    const [walkInOpen, setWalkInOpen] = useState(false);
+    const [collectFor, setCollectFor] = useState<Arrival | null>(null);
     const [toast, setToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
     const [refreshing, setRefreshing] = useState(false);
 
     // Keep the screen current while it sits on the counter.
     useEffect(() => {
-        const t = setInterval(() => router.reload({ only: ['arrivals', 'chargers'], onStart: () => setRefreshing(true), onFinish: () => setRefreshing(false) }), 30_000);
+        const t = setInterval(() => router.reload({ only: ['arrivals', 'chargers', 'walkIn'], onStart: () => setRefreshing(true), onFinish: () => setRefreshing(false) }), 30_000);
         return () => clearInterval(t);
     }, []);
 
@@ -89,6 +98,7 @@ export default function StaffConsole(props: Props) {
         waiting: arrivals.filter((a) => a.status === 'confirmed').length,
         charging: arrivals.filter((a) => a.session?.status === 'active').length,
         done: arrivals.filter((a) => a.status === 'completed').length,
+        unpaid: arrivals.filter((a) => a.settlement === 'due' && a.status === 'completed').length,
     };
 
     return (
@@ -144,7 +154,22 @@ export default function StaffConsole(props: Props) {
                     <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">You are not assigned to any station yet. Ask your company admin.</div>
                 )}
 
-                {station && can.checkIn && <ScanBar />}
+                {station && (can.checkIn || can.walkIns) && (
+                    <div className="flex gap-2">
+                        <div className="flex-1">{can.checkIn && <ScanBar />}</div>
+                        {can.walkIns && props.walkIn && (
+                            <button type="button" onClick={() => setWalkInOpen(true)} className="flex h-[60px] shrink-0 items-center gap-2 rounded-2xl bg-gradient-to-r from-volt-600 to-electric px-4 font-semibold text-white shadow-md shadow-volt/20">
+                                <Plus className="size-5" /> Walk-in
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {counts.unpaid > 0 && (
+                    <p className="flex items-center gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-800 dark:text-amber-200">
+                        <Banknote className="size-5" /> {counts.unpaid} walk-in{counts.unpaid > 1 ? 's' : ''} waiting for payment
+                    </p>
+                )}
 
                 {station && tab === 'arrivals' && (
                     <>
@@ -164,6 +189,7 @@ export default function StaffConsole(props: Props) {
                                     onCheckIn={() => post(`/staff/bookings/${a.code}/check-in`)}
                                     onStart={() => setStartFor(a)}
                                     onStop={() => a.session && setStopFor({ uuid: a.session.uuid, label: `${a.code} · ${a.registration ?? ''}`, meterStart: a.session.meterStart, startedIso: a.session.startedIso })}
+                                    onCollect={() => setCollectFor(a)}
                                     onNoShow={() => confirm(`Mark ${a.code} as a no-show? The customer gets the no-show refund agreed at booking.`) && post(`/staff/bookings/${a.code}/no-show`)}
                                 />
                             ))
@@ -213,6 +239,8 @@ export default function StaffConsole(props: Props) {
             <StartSheet a={startFor} onClose={() => setStartFor(null)} />
             <StopSheet s={stopFor} reasons={props.stopReasons} onClose={() => setStopFor(null)} />
             <StatusSheet k={statusFor} statuses={props.manualStatuses} onClose={() => setStatusFor(null)} />
+            {props.walkIn && <WalkInSheet open={walkInOpen} options={props.walkIn} onClose={() => setWalkInOpen(false)} />}
+            <CollectSheet a={collectFor} onClose={() => setCollectFor(null)} />
         </div>
     );
 }
@@ -230,7 +258,7 @@ function Chip({ tone, children }: { tone: string; children: ReactNode }) {
     return <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1', TONE[tone] ?? TONE.gray)}>{children}</span>;
 }
 
-function ArrivalCard({ a, can, onCheckIn, onStart, onStop, onNoShow }: { a: Arrival; can: Props['can']; onCheckIn: () => void; onStart: () => void; onStop: () => void; onNoShow: () => void }) {
+function ArrivalCard({ a, can, onCheckIn, onStart, onStop, onNoShow, onCollect }: { a: Arrival; can: Props['can']; onCheckIn: () => void; onStart: () => void; onStop: () => void; onNoShow: () => void; onCollect: () => void }) {
     const now = useNow(15_000);
     const lateBy = a.status === 'confirmed' ? Math.floor((now - new Date(a.startIso).getTime()) / 60000) : 0;
     const active = a.session?.status === 'active';
@@ -245,6 +273,7 @@ function ArrivalCard({ a, can, onCheckIn, onStart, onStop, onNoShow }: { a: Arri
                     <p className="font-mono text-xs text-muted-foreground">{a.code}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
+                    {a.source === 'walk_in' && <Chip tone="info">Walk-in</Chip>}
                     <Chip tone={active ? 'warning' : (STATUS_TONE[a.status] ?? 'gray')}>{active ? 'Charging' : a.status === 'checked_in' ? 'Checked in' : a.statusLabel}</Chip>
                     {lateBy > 0 && a.status === 'confirmed' && <Chip tone="danger">Late {lateBy} min</Chip>}
                 </div>
@@ -275,15 +304,17 @@ function ArrivalCard({ a, can, onCheckIn, onStart, onStop, onNoShow }: { a: Arri
                         )}
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <BatteryCharging className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <div>
-                        <p className="font-medium">
-                            {a.batteryFrom}% → {a.batteryTo}%
-                        </p>
-                        <p className="text-xs text-muted-foreground">≈ {a.estKwh.toFixed(1)} kWh booked</p>
+                {a.source !== 'walk_in' && (
+                    <div className="flex gap-2">
+                        <BatteryCharging className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                        <div>
+                            <p className="font-medium">
+                                {a.batteryFrom}% → {a.batteryTo}%
+                            </p>
+                            <p className="text-xs text-muted-foreground">≈ {a.estKwh.toFixed(1)} kWh booked</p>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {active && a.session && (
@@ -298,6 +329,27 @@ function ArrivalCard({ a, can, onCheckIn, onStart, onStop, onNoShow }: { a: Arri
                 </p>
             )}
             {a.status === 'confirmed' && a.blocker && <p className="mt-3 text-xs text-muted-foreground">{a.blocker}</p>}
+            {a.bill && (
+                <div className={cn('mt-3 rounded-xl border p-3 text-sm', a.settlement === 'paid' ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/40 bg-amber-500/5')}>
+                    {a.bill.lines.map((l, i) => (
+                        <div key={i} className="flex justify-between gap-2 text-muted-foreground">
+                            <span>
+                                {l.label} {l.unit === 'kWh' && <span className="text-xs">({l.qty.toFixed(2)} kWh)</span>}
+                            </span>
+                            <span className="tabular-nums">₹{l.amount.toFixed(2)}</span>
+                        </div>
+                    ))}
+                    <div className="flex justify-between gap-2 text-muted-foreground">
+                        <span>GST</span>
+                        <span className="tabular-nums">₹{a.bill.tax.toFixed(2)}</span>
+                    </div>
+                    <div className="mt-1 flex justify-between gap-2 border-t border-border pt-1 text-base font-bold">
+                        <span>{a.settlement === 'paid' ? 'Paid' : 'To pay'}</span>
+                        <span className="tabular-nums">₹{a.bill.total.toFixed(2)}</span>
+                    </div>
+                    {a.bill.paidBy && <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">{a.bill.paidBy}</p>}
+                </div>
+            )}
 
             <div className="mt-4 flex flex-wrap gap-2">
                 {a.status === 'confirmed' && can.checkIn && !a.blocker && (
@@ -314,6 +366,16 @@ function ArrivalCard({ a, can, onCheckIn, onStart, onStop, onNoShow }: { a: Arri
                     <Action onClick={onStop} danger icon={<Square className="size-4" />}>
                         Stop charging
                     </Action>
+                )}
+                {a.bill && a.settlement === 'due' && can.walkIns && (
+                    <Action onClick={onCollect} primary icon={<Banknote className="size-4" />}>
+                        Take payment
+                    </Action>
+                )}
+                {a.bill?.invoiceUrl && (
+                    <a href={a.bill.invoiceUrl} target="_blank" rel="noopener" className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-border bg-background px-4 text-sm font-semibold hover:bg-muted sm:flex-none">
+                        <FileText className="size-4" /> Invoice
+                    </a>
                 )}
                 {a.canNoShow && (
                     <Action onClick={onNoShow} icon={<UserX className="size-4" />}>
@@ -638,6 +700,234 @@ function StatusSheet({ k, statuses, onClose }: { k: ConnectorRow | null; statuse
                         {form.processing ? <LoaderCircle className="size-5 animate-spin" /> : <CheckCircle2 className="size-5" />} Save status
                     </button>
                 </form>
+            </SheetContent>
+        </Sheet>
+    );
+}
+
+function WalkInSheet({ open, options, onClose }: { open: boolean; options: WalkInOptions; onClose: () => void }) {
+    const form = useForm({ connector_id: '', registration_no: '', make: '', model: '', name: '', phone: '', email: '', gstin: '', minutes: 60, meter_start: '', informed: false as boolean });
+    const chosen = options.connectors.find((c) => String(c.id) === form.data.connector_id);
+    const durations = options.durations.filter((d) => !chosen || d <= chosen.maxMinutes);
+    useEffect(() => {
+        if (open) form.reset();
+    }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        if (chosen && form.data.minutes > chosen.maxMinutes) form.setData('minutes', durations[durations.length - 1] ?? chosen.maxMinutes);
+    }, [form.data.connector_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const input = 'mt-1 h-11 w-full rounded-xl border border-border bg-background px-3';
+    return (
+        <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+            <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-3xl">
+                <SheetHeader>
+                    <SheetTitle>Walk-in charging</SheetTitle>
+                    <SheetDescription>For drivers without a booking. They pay for the energy actually delivered when charging stops.</SheetDescription>
+                </SheetHeader>
+                <form
+                    className="space-y-4 px-4 pb-6"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        form.post('/staff/walk-ins', { preserveScroll: true, onSuccess: onClose });
+                    }}
+                >
+                    <fieldset>
+                        <legend className="text-sm font-medium">Connector</legend>
+                        {options.connectors.length === 0 ? (
+                            <p className="mt-2 rounded-xl bg-muted p-3 text-sm text-muted-foreground">No connector is free right now.</p>
+                        ) : (
+                            <div className="mt-2 grid gap-2">
+                                {options.connectors.map((c) => (
+                                    <button key={c.id} type="button" onClick={() => form.setData('connector_id', String(c.id))}
+                                        className={cn('rounded-xl border p-3 text-left', form.data.connector_id === String(c.id) ? 'border-foreground ring-2 ring-foreground' : 'border-border hover:bg-muted')}>
+                                        <p className="font-semibold">{c.label}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {c.powerKw} kW · {c.freeUntil ? `free until ${c.freeUntil}` : 'free for the rest of the day'}{c.price && ` · ${c.price}`}
+                                        </p>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        <FieldError name="connector_id" />
+                    </fieldset>
+                    <div>
+                        <span className="text-sm font-medium">Charge for up to</span>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {durations.map((d) => (
+                                <button key={d} type="button" onClick={() => form.setData('minutes', d)}
+                                    className={cn('h-10 rounded-full border px-4 text-sm font-semibold', form.data.minutes === d ? 'border-foreground bg-foreground text-background' : 'border-border')}>
+                                    {d >= 60 ? `${d / 60} h` : `${d} min`}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">Holds the connector against online bookings; it is freed as soon as you stop.</p>
+                        <FieldError name="minutes" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="col-span-2">
+                            <label htmlFor="wi-reg" className="text-sm font-medium">Number plate</label>
+                            <input id="wi-reg" required value={form.data.registration_no} onChange={(e) => form.setData('registration_no', e.target.value.toUpperCase())} className={cn(input, 'font-mono text-lg tracking-wider')} placeholder="MH12AB1234" />
+                            <FieldError name="registration_no" />
+                        </div>
+                        <div>
+                            <label htmlFor="wi-make" className="text-sm font-medium">Make</label>
+                            <input id="wi-make" value={form.data.make} onChange={(e) => form.setData('make', e.target.value)} className={input} placeholder="Tata" />
+                        </div>
+                        <div>
+                            <label htmlFor="wi-model" className="text-sm font-medium">Model</label>
+                            <input id="wi-model" value={form.data.model} onChange={(e) => form.setData('model', e.target.value)} className={input} placeholder="Nexon EV" />
+                        </div>
+                        <div>
+                            <label htmlFor="wi-name" className="text-sm font-medium">Driver name</label>
+                            <input id="wi-name" required value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} className={input} />
+                            <FieldError name="name" />
+                        </div>
+                        <div>
+                            <label htmlFor="wi-phone" className="text-sm font-medium">Mobile</label>
+                            <input id="wi-phone" required inputMode="numeric" maxLength={10} value={form.data.phone} onChange={(e) => form.setData('phone', e.target.value.replace(/\D/g, ''))} className={input} />
+                            <FieldError name="phone" />
+                        </div>
+                        <div>
+                            <label htmlFor="wi-email" className="text-sm font-medium">Email <span className="font-normal text-muted-foreground">for invoice</span></label>
+                            <input id="wi-email" type="email" value={form.data.email} onChange={(e) => form.setData('email', e.target.value)} className={input} />
+                            <FieldError name="email" />
+                        </div>
+                        <div>
+                            <label htmlFor="wi-gstin" className="text-sm font-medium">GSTIN <span className="font-normal text-muted-foreground">business</span></label>
+                            <input id="wi-gstin" value={form.data.gstin} onChange={(e) => form.setData('gstin', e.target.value.toUpperCase())} maxLength={15} className={cn(input, 'font-mono')} />
+                            <FieldError name="gstin" />
+                        </div>
+                        <div className="col-span-2">
+                            <label htmlFor="wi-meter" className="text-sm font-medium">Meter reading now (kWh) <span className="font-normal text-muted-foreground">optional</span></label>
+                            <input id="wi-meter" inputMode="decimal" value={form.data.meter_start} onChange={(e) => form.setData('meter_start', e.target.value)} className={cn(input, 'font-mono')} />
+                            <FieldError name="meter_start" />
+                        </div>
+                    </div>
+                    <label className="flex items-start gap-3 rounded-xl bg-muted p-3 text-sm">
+                        <input type="checkbox" checked={form.data.informed} onChange={(e) => form.setData('informed', e.target.checked)} className="mt-0.5 size-5" />
+                        <span>I told the driver the price{chosen?.price ? ` (${chosen.price})` : ''} and the station rules.</span>
+                    </label>
+                    <FieldError name="informed" />
+                    <button type="submit" disabled={form.processing || !form.data.connector_id} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-volt-600 to-electric font-semibold text-white disabled:opacity-60">
+                        {form.processing ? <LoaderCircle className="size-5 animate-spin" /> : <Play className="size-5" />} Start charging
+                    </button>
+                </form>
+            </SheetContent>
+        </Sheet>
+    );
+}
+
+function CollectSheet({ a, onClose }: { a: Arrival | null; onClose: () => void }) {
+    const [method, setMethod] = useState<'cash' | 'upi_manual' | 'link'>('cash');
+    const form = useForm({ method: 'cash', reference: '' });
+    const [link, setLink] = useState<{ url: string; qr: string } | null>(null);
+    const [linkError, setLinkError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        setMethod('cash');
+        setLink(null);
+        setLinkError(null);
+        form.reset();
+    }, [a?.code]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // While the driver pays online, refresh until the console shows it paid.
+    useEffect(() => {
+        if (!link || !a) return;
+        const t = setInterval(() => router.reload({ only: ['arrivals'] }), 5000);
+        return () => clearInterval(t);
+    }, [link, a]);
+
+    const makeLink = async () => {
+        if (!a) return;
+        setLoading(true);
+        setLinkError(null);
+        try {
+            const token = decodeURIComponent(document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? '');
+            const r = await fetch(`/staff/bookings/${a.code}/payment-link`, { method: 'POST', headers: { Accept: 'application/json', 'X-XSRF-TOKEN': token }, credentials: 'same-origin' });
+            const j = await r.json();
+            if (!r.ok) throw new Error(j?.errors ? (Object.values(j.errors)[0] as string[])[0] : j?.message ?? 'Could not create the link.');
+            setLink(j);
+        } catch (e) {
+            setLinkError((e as Error).message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (a && a.settlement === 'paid' && link) {
+        // Paid online while the sheet was open.
+        setTimeout(onClose, 0);
+    }
+
+    const tabs = [
+        { key: 'cash', label: 'Cash', icon: Banknote },
+        { key: 'upi_manual', label: 'UPI', icon: Smartphone },
+        { key: 'link', label: 'Online link', icon: QrCode },
+    ] as const;
+
+    return (
+        <Sheet open={!!a} onOpenChange={(o) => !o && onClose()}>
+            <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-3xl">
+                <SheetHeader>
+                    <SheetTitle>Take payment · ₹{a?.bill?.total.toFixed(2)}</SheetTitle>
+                    <SheetDescription>
+                        {a?.code} · {a?.registration} · {a?.session?.energy?.toFixed(2)} kWh
+                    </SheetDescription>
+                </SheetHeader>
+                <div className="space-y-4 px-4 pb-6">
+                    <div className="grid grid-cols-3 gap-2">
+                        {tabs.map((t) => (
+                            <button key={t.key} type="button" onClick={() => { setMethod(t.key); form.setData('method', t.key === 'link' ? 'cash' : t.key); }}
+                                className={cn('flex h-14 flex-col items-center justify-center gap-0.5 rounded-xl border text-xs font-semibold', method === t.key ? 'border-foreground bg-foreground text-background' : 'border-border')}>
+                                <t.icon className="size-5" /> {t.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {method !== 'link' ? (
+                        <form
+                            className="space-y-4"
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                form.post(`/staff/bookings/${a?.code}/collect`, { preserveScroll: true, onSuccess: onClose });
+                            }}
+                        >
+                            {method === 'upi_manual' && (
+                                <div>
+                                    <label htmlFor="utr" className="text-sm font-medium">UPI reference (UTR) from the driver’s app</label>
+                                    <input id="utr" required value={form.data.reference} onChange={(e) => form.setData('reference', e.target.value.replace(/\s/g, ''))}
+                                        className="mt-1 h-12 w-full rounded-xl border border-border bg-background px-3 font-mono text-lg" inputMode="numeric" maxLength={30} />
+                                    <FieldError name="reference" />
+                                </div>
+                            )}
+                            {method === 'cash' && <p className="rounded-xl bg-muted p-3 text-sm text-muted-foreground">Count the cash before you confirm. The GST invoice is issued straight away.</p>}
+                            <FieldError name="method" />
+                            <button type="submit" disabled={form.processing} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
+                                {form.processing ? <LoaderCircle className="size-5 animate-spin" /> : <CheckCircle2 className="size-5" />}
+                                {method === 'cash' ? 'Cash received' : 'UPI payment received'} · ₹{a?.bill?.total.toFixed(2)}
+                            </button>
+                        </form>
+                    ) : link ? (
+                        <div className="text-center">
+                            <div className="mx-auto w-56 rounded-2xl bg-white p-3">
+                                <img src={link.qr} alt="Payment QR" className="w-full [image-rendering:pixelated]" />
+                            </div>
+                            <p className="mt-3 text-sm text-muted-foreground">Ask the driver to scan this with their phone camera and pay. This screen updates when the payment arrives.</p>
+                            <p className="mt-2 flex items-center justify-center gap-2 text-sm font-medium">
+                                <LoaderCircle className="size-4 animate-spin" /> Waiting for payment…
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <p className="text-sm text-muted-foreground">Creates a secure SabPaisa link (UPI, cards, net-banking). The driver scans a QR and pays on their own phone.</p>
+                            {linkError && <p className="text-sm text-red-600 dark:text-red-400">{linkError}</p>}
+                            <button type="button" onClick={makeLink} disabled={loading} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground font-semibold text-background disabled:opacity-60">
+                                {loading ? <LoaderCircle className="size-5 animate-spin" /> : <QrCode className="size-5" />} Show payment QR
+                            </button>
+                        </div>
+                    )}
+                </div>
             </SheetContent>
         </Sheet>
     );

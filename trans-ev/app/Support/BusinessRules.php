@@ -25,6 +25,9 @@ final class BusinessRules
         // Check-in (C1)
         'checkin.early_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 15, 'min' => 0, 'max' => 120, 'label' => 'Check-in opens before the slot (minutes)', 'help' => 'Customers can be checked in this long before their slot starts, if the charger is free.'],
         'checkin.qr_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 5, 'min' => 1, 'max' => 60, 'label' => 'Check-in QR valid for (minutes)', 'help' => 'The QR on the customer’s booking refreshes automatically; screenshots stop working after this.'],
+        // Walk-ins (C3)
+        'walkin.max_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 180, 'min' => 15, 'max' => 720, 'label' => 'Longest walk-in session (minutes)', 'help' => 'Also limited by the next online booking on that connector.'],
+        'platform_fees.walk_ins' => ['group' => 'Platform fees', 'type' => 'int', 'default' => 0, 'min' => 0, 'max' => 1, 'label' => 'Charge platform fees on walk-in sales (1 = yes, 0 = no)', 'help' => 'Walk-ins are paid at the station; by default only online bookings carry the platform fee.'],
         // Pricing estimate
         'pricing.charging_efficiency' => ['group' => 'Pricing estimate', 'type' => 'decimal', 'default' => '0.90', 'min' => 0.5, 'max' => 1, 'label' => 'Charging efficiency', 'help' => 'Share of energy drawn from the charger that reaches the battery.'],
         'pricing.power_utilisation' => ['group' => 'Pricing estimate', 'type' => 'decimal', 'default' => '0.85', 'min' => 0.3, 'max' => 1, 'label' => 'Average power utilisation', 'help' => 'Average share of rated power a vehicle draws (charging slows near full).'],

@@ -34,6 +34,16 @@ if (config('payments.sabpaisa.simulate')) {
 }
 
 // Station owners: self-registration (reviewed by Trans EV before going live)
+Route::get('/walk-in/paid/{payment:uuid}', function (\App\Models\Payment $payment) {
+    abort_unless($payment->booking?->source === 'walk_in', 404);
+    if ($payment->status === \App\Models\Payment::PENDING) {
+        $payment = app(\App\Services\Payments\PaymentService::class)->reconcile($payment);
+    }
+
+    return view('checkin.walk-in-paid', ['payment' => $payment->load('booking.station', 'booking.invoice'),
+        'invoiceUrl' => \Illuminate\Support\Facades\URL::temporarySignedRoute('walk-in.invoice', now()->addDays(30), ['payment' => $payment->uuid])]);
+})->middleware('throttle:30,1')->name('walk-in.paid');
+Route::get('/walk-in/{payment:uuid}/invoice', [\App\Http\Controllers\InvoiceController::class, 'walkIn'])->middleware(['signed', 'throttle:30,1'])->name('walk-in.invoice');
 Route::get('/verify/invoice/{invoice:uuid}', [\App\Http\Controllers\InvoiceController::class, 'verify'])->middleware('throttle:30,1')->name('invoices.verify');
 Route::get('/partner', [PartnerController::class, 'create'])->name('partner.create');
 Route::post('/partner', [PartnerController::class, 'store'])->middleware('throttle:3,10')->name('partner.store');
@@ -99,6 +109,9 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/bookings/{booking:code}/no-show', [\App\Http\Controllers\StaffConsoleController::class, 'noShow'])->name('no-show');
         Route::post('/sessions/{session:uuid}/stop', [\App\Http\Controllers\StaffConsoleController::class, 'stop'])->name('stop');
         Route::post('/connectors/{connector}/status', [\App\Http\Controllers\StaffConsoleController::class, 'connectorStatus'])->name('connector-status');
+        Route::post('/walk-ins', [\App\Http\Controllers\StaffConsoleController::class, 'walkIn'])->name('walk-in');
+        Route::post('/bookings/{booking:code}/collect', [\App\Http\Controllers\StaffConsoleController::class, 'collect'])->name('collect');
+        Route::post('/bookings/{booking:code}/payment-link', [\App\Http\Controllers\StaffConsoleController::class, 'paymentLink'])->name('payment-link');
     });
     // C1 check-in
     Route::get('/account/bookings/{booking:code}/pass', [\App\Http\Controllers\CheckInController::class, 'pass'])->middleware('throttle:30,1')->name('bookings.pass');

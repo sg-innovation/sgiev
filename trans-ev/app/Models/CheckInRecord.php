@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** Who checked a booking in, how (staff scan, charger QR, manual) and when. */
 class CheckInRecord extends Model
 {
-    public const METHODS = ['staff_scan' => 'Staff scanned the customer’s QR', 'charger_scan' => 'Customer scanned the charger QR', 'manual' => 'Checked in by staff'];
+    public const METHODS = ['staff_scan' => 'Staff scanned the customer’s QR', 'charger_scan' => 'Customer scanned the charger QR', 'manual' => 'Checked in by staff', 'walk_in' => 'Walk-in started by staff'];
 
     protected $guarded = ['id'];
 

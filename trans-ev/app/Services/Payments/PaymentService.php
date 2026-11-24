@@ -101,6 +101,47 @@ class PaymentService
         });
     }
 
+    /** Online payment link for a walk-in bill (C3); the driver pays on their own phone. Returns the checkout URL. */
+    public function startWalkIn(Booking $booking): string
+    {
+        $booking->loadMissing('station.company');
+        $company = $booking->station->company;
+        if (! $this->gateways->canAcceptPayments($company)) {
+            throw ValidationException::withMessages(['method' => 'Online payment is not set up for this station. Take cash or UPI instead.']);
+        }
+        $open = $booking->payments()->where('status', Payment::PENDING)->where('expires_at', '>', now()->addMinutes(2))->latest('id')->first();
+        if ($open) {
+            return $this->gateways->forPayment($open)->redirectUrl($open);
+        }
+        $gateway = $this->gateways->for($company);
+
+        return DB::transaction(function () use ($booking, $company, $gateway) {
+            $payment = Payment::create([
+                'company_id' => $company->id, 'booking_id' => $booking->id, 'user_id' => null, 'purpose' => 'booking',
+                'environment' => $gateway->environment(), 'merchant_txn_id' => 'TEVW'.now()->format('ymdHis').Str::upper(Str::random(6)),
+                'amount' => $booking->total_amount, 'status' => Payment::CREATED,
+            ]);
+            try {
+                $session = $gateway->createSession($payment, [
+                    'name' => $booking->customer_snapshot['name'] ?? 'EV Customer',
+                    'email' => $booking->customer_snapshot['email'] ?? ($company->email ?: 'noreply@'.parse_url((string) config('app.url'), PHP_URL_HOST)),
+                    'phone' => $booking->customer_snapshot['phone'] ?? '',
+                ], route('payments.return', ['payment' => $payment->uuid]), "EV charging {$booking->code} at {$booking->station->name}");
+            } catch (GatewayException $e) {
+                $this->log($payment, 'create', 'failed', PaymentEvent::scrub($e->payload));
+                $payment->update(['status' => Payment::FAILED, 'failure_reason' => Str::limit($e->getMessage(), 250)]);
+                throw ValidationException::withMessages(['method' => 'We could not create the payment link. Take cash or UPI, or try again.']);
+            }
+            $payment->update([
+                'status' => Payment::PENDING, 'gateway_payment_id' => $session['payment_id'] ?: null, 'checkout_url' => $session['checkout_url'],
+                'client_secret' => $session['client_secret'], 'expires_at' => $session['expires_at'] ? \Illuminate\Support\Carbon::parse($session['expires_at']) : now()->addMinutes(30),
+            ]);
+            $this->log($payment, 'create', 'session_created', PaymentEvent::scrub($session['raw']));
+
+            return $gateway->redirectUrl($payment);
+        });
+    }
+
     /** Start an online wallet recharge for an operator, paid into Trans EV's own payment account. Returns the checkout URL. */
     public function startRecharge(Company $operator, string $amount, \App\Models\User $by): string
     {
@@ -252,6 +293,9 @@ class PaymentService
     {
         /** @var Booking $booking */
         $booking = Booking::query()->whereKey($payment->booking_id)->lockForUpdate()->first();
+        if ($booking->source === 'walk_in' && app(\App\Services\WalkInService::class)->settleOnline($booking, $payment)) {
+            return;
+        }
         $connector = \App\Models\Connector::query()->withTrashed()->whereKey($booking->connector_id)->lockForUpdate()->first();
 
         $amountOk = bccomp((string) ($payment->paid_amount ?? $payment->amount), (string) $booking->total_amount, 2) === 0;

@@ -244,6 +244,9 @@ class InvoiceService
             if ($user && empty($doc->booking->customer_snapshot['demo'])) {
                 $user->notify(new GstDocumentIssued($doc));
                 $doc->forceFill(['emailed_at' => now()])->save();
+            } elseif (! $user && ($email = $doc->booking?->customer_snapshot['email'] ?? null) && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                \Illuminate\Support\Facades\Notification::route('mail', $email)->notify(new GstDocumentIssued($doc));
+                $doc->forceFill(['emailed_at' => now()])->save();
             }
         } catch (\Throwable $e) {
             Log::error('GST document email failed', ['number' => $doc->number, 'error' => $e->getMessage()]);

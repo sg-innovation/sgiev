@@ -128,7 +128,10 @@ class ChargingSessionService
                 'status' => 'completed', 'stopped_at' => now(), 'meter_stop_kwh' => $stopReading, 'energy_kwh' => $kwh, 'energy_source' => $source,
                 'stopped_by' => $by->id, 'stop_reason' => $reason, 'note' => $note ? mb_substr($note, 0, 255) : null,
             ])->save();
-            if ($s->booking_id) {
+            if ($s->booking_id && ($walkIn = Booking::query()->whereKey($s->booking_id)->where('source', 'walk_in')->where('status', BookingStatus::CheckedIn)->first())) {
+                app(WalkInService::class)->bill($walkIn, $s);
+                activity()->performedOn($walkIn)->causedBy($by)->withProperties(['kwh' => $kwh])->log('charging stopped');
+            } elseif ($s->booking_id) {
                 Booking::query()->whereKey($s->booking_id)->where('status', BookingStatus::CheckedIn)->update(['status' => BookingStatus::Completed->value]);
                 activity()->performedOn($s->booking)->causedBy($by)->withProperties(['kwh' => $kwh])->log('charging stopped');
             }

@@ -28,6 +28,15 @@ class InvoiceController extends Controller
         return $this->send($invoice, $request->boolean('download'));
     }
 
+    /** Walk-in drivers have no account: their invoice is reached through a signed link (paid page or receipt QR). */
+    public function walkIn(Request $request, \App\Models\Payment $payment): Response
+    {
+        $invoice = $payment->booking?->invoice;
+        abort_unless($payment->status === \App\Models\Payment::SUCCESS && $payment->booking?->source === 'walk_in' && $invoice, 404);
+
+        return $this->send($invoice, $request->boolean('download'));
+    }
+
     public function creditNote(Request $request, CreditNote $creditNote): Response
     {
         Gate::authorize('view', $creditNote->booking);

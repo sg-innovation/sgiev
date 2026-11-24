@@ -100,6 +100,7 @@ class PlatformFeeService
     {
         $paidStatuses = [BookingStatus::Confirmed, BookingStatus::CheckedIn, BookingStatus::Completed, BookingStatus::NoShow, BookingStatus::Cancelled];
         $bookings = Booking::query()->where('company_id', $company->id)->whereIn('status', $paidStatuses)
+            ->when(\App\Support\BusinessRules::int('platform_fees.walk_ins') !== 1, fn ($q) => $q->where('source', '!=', 'walk_in'))
             ->whereHas('payments', fn ($q) => $q->where('status', Payment::SUCCESS)->whereBetween('paid_at', [$from->copy()->utc(), $to->copy()->utc()]))
             ->with('refunds')->get();
 
