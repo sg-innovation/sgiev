@@ -53,9 +53,9 @@ class RefundService
      * Mark a confirmed booking as a no-show (charging not started within the no-show window) and refund
      * the no-show share of the agreed policy, if any.
      */
-    public function markNoShow(Booking $booking, User $by): ?Refund
+    public function markNoShow(Booking $booking, ?User $by, string $method = 'staff', ?int $grace = null): ?Refund
     {
-        $window = \App\Support\BusinessRules::int('booking.no_show_minutes');
+        $window = $grace ?? \App\Support\BusinessRules::int('booking.no_show_minutes');
         if ($booking->status !== BookingStatus::Confirmed || now()->lt($booking->start_at->copy()->addMinutes($window))) {
             throw ValidationException::withMessages(['booking' => "A booking can be marked as a no-show only {$window} minutes after its start time."]);
         }
@@ -65,13 +65,34 @@ class RefundService
         $refund = \App\Services\GstService::round(bcdiv(bcmul($paid, (string) $percent, 4), '100', 4));
 
         DB::transaction(fn () => $booking->forceFill(['status' => BookingStatus::NoShow, 'no_show_at' => now()])->save());
-        activity()->performedOn($booking)->causedBy($by)->withProperties(['refund_percent' => $percent])->log('marked no-show');
+        activity()->performedOn($booking)->causedBy($by)->withProperties(['refund_percent' => $percent, 'method' => $method, 'grace_minutes' => $window])->log('marked no-show');
 
-        if (! $payment || bccomp($refund, '0', 2) <= 0) {
-            return null;
+        $refunding = $payment && bccomp($refund, '0', 2) > 0 ? $refund : '0.00';
+        $record = \App\Models\NoShowRecord::create([
+            'booking_id' => $booking->id, 'company_id' => $booking->company_id, 'station_id' => $booking->station_id, 'connector_id' => $booking->connector_id,
+            'method' => $method, 'marked_by' => $by?->id, 'marked_at' => now(), 'grace_minutes' => $window,
+            'late_notice_at' => $booking->late_notice_at, 'late_eta_at' => $booking->late_eta_at, 'refund_percent' => $percent,
+            'paid_amount' => $paid, 'refund_amount' => $refunding, 'retained_amount' => bcsub($paid, $refunding, 2),
+        ]);
+        $result = null;
+        if ($refunding !== '0.00') {
+            try {
+                $result = $this->refundPayment($payment, $refund, 'No-show', "No-show ({$percent}% refund)", $by, bcsub($paid, $refund, 2));
+                $record->forceFill(['refund_id' => $result->id])->save();
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('No-show refund failed', ['booking' => $booking->code, 'error' => $e->getMessage()]);
+            }
+        }
+        try {
+            $booking->user?->notify(new \App\Notifications\BookingNotice('booking.no_show', $booking, [
+                'grace_minutes' => (string) $window, 'refund' => number_format((float) $record->refund_amount, 2),
+                'retained' => number_format((float) $record->retained_amount, 2), 'percent' => (string) $percent,
+            ]));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('No-show email failed', ['booking' => $booking->code, 'error' => $e->getMessage()]);
         }
 
-        return $this->refundPayment($payment, $refund, 'No-show', "No-show ({$percent}% refund)", $by, bcsub($paid, $refund, 2));
+        return $result;
     }
 
     /** Cancel a booking and refund per policy (customer) or in full (operator). */

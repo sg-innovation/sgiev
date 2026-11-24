@@ -40,3 +40,7 @@ Schedule::call(fn () => app(\App\Services\PlatformFeeService::class)->generateAl
 $reconcileAt = (string) rescue(fn () => \App\Support\BusinessRules::get('reconciliation.run_time'), '05:30', false);
 Schedule::command('reconciliation:run')->dailyAt(preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $reconcileAt) ? $reconcileAt : '05:30')
     ->timezone('Asia/Kolkata')->withoutOverlapping();
+
+// C5: reminders before the slot and automatic no-shows after the grace period.
+Schedule::call(fn () => app(\App\Services\NoShowService::class)->sendReminders())->name('bookings:reminders')->everyMinute()->withoutOverlapping();
+Schedule::call(fn () => app(\App\Services\NoShowService::class)->sweep())->name('bookings:auto-no-show')->everyMinute()->withoutOverlapping();

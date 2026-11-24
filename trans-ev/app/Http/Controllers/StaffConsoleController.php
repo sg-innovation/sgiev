@@ -210,6 +210,8 @@ class StaffConsoleController extends Controller
                     'checkedInAt' => $b->checked_in_at?->timezone($tz)->format('g:i A'),
                     'blocker' => $b->status === BookingStatus::Confirmed ? $this->checkIns->blocker($b) : null,
                     'source' => $b->source, 'settlement' => $b->settlement,
+                    'lateEta' => $b->status === BookingStatus::Confirmed ? $b->late_eta_at?->timezone($tz)->format('g:i A') : null, 'lateNote' => $b->late_note,
+                    'noShowAt' => $b->status === BookingStatus::Confirmed ? app(\App\Services\NoShowService::class)->noShowAt($b)->timezone($tz)->format('g:i A') : null,
                     'bill' => $b->source === 'walk_in' && $b->status === BookingStatus::Completed ? [
                         'kind' => 'walk_in', 'total' => (float) $b->total_amount, 'due' => (float) $b->total_amount, 'taxable' => (float) $b->taxable_amount,
                         'tax' => (float) $b->cgst_amount + (float) $b->sgst_amount + (float) $b->igst_amount,

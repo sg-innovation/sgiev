@@ -22,6 +22,10 @@ final class BusinessRules
         'booking.min_lead_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 10, 'min' => 0, 'max' => 240, 'label' => 'Minimum notice before a slot (minutes)', 'help' => null],
         'booking.no_show_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 10, 'min' => 0, 'max' => 60, 'label' => 'No-show after (minutes)', 'help' => 'A booking counts as a no-show if charging has not started this long after the slot start.'],
         'booking.max_slots' => ['group' => 'Booking', 'type' => 'int', 'default' => 3, 'min' => 1, 'max' => 12, 'label' => 'Longest booking (slots)', 'help' => 'Used when a station does not set its own allowed durations.'],
+        // Reminders and no-shows (C5)
+        'reminders.before_minutes' => ['group' => 'Booking', 'type' => 'string', 'default' => '60,15,0', 'label' => 'Send reminders this many minutes before the slot (comma-separated; 0 = at the start time)', 'help' => 'Leave empty to send no reminders.'],
+        'booking.auto_no_show' => ['group' => 'Booking', 'type' => 'int', 'default' => 1, 'min' => 0, 'max' => 1, 'label' => 'Mark no-shows automatically (1 = yes, 0 = staff mark them)', 'help' => 'Refunds follow the no-show policy agreed at checkout.'],
+        'booking.late_extra_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 15, 'min' => 0, 'max' => 120, 'label' => 'Extra grace when the customer says they are running late (minutes)', 'help' => 'Added to the no-show time, up to this limit.'],
         // Check-in (C1)
         'checkin.early_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 15, 'min' => 0, 'max' => 120, 'label' => 'Check-in opens before the slot (minutes)', 'help' => 'Customers can be checked in this long before their slot starts, if the charger is free.'],
         'checkin.qr_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 5, 'min' => 1, 'max' => 60, 'label' => 'Check-in QR valid for (minutes)', 'help' => 'The QR on the customer’s booking refreshes automatically; screenshots stop working after this.'],

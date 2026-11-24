@@ -11,7 +11,7 @@ interface Arrival {
     code: string; status: string; statusLabel: string; start: string; end: string; startIso: string; endIso: string;
     customer: string | null; phone: string | null; vehicle: string; registration: string | null; charger: string | null; connector: string | null;
     batteryFrom: number; batteryTo: number; estKwh: number; checkedInAt: string | null; blocker: string | null; canNoShow: boolean; session: Session | null;
-    source: string; settlement: string | null;
+    source: string; settlement: string | null; lateEta: string | null; lateNote: string | null; noShowAt: string | null;
     bill: { kind: 'walk_in' | 'final'; total: number; due: number; prepaid: number | null; outcome: string | null; taxable: number | null; tax: number | null; lines: { label: string; qty: number; unit: string; amount: number }[]; paidBy: string | null; invoiceUrl: string | null } | null;
 }
 interface WalkInOptions {
@@ -279,6 +279,7 @@ function ArrivalCard({ a, can, onCheckIn, onStart, onStop, onNoShow, onCollect, 
                     {a.source === 'walk_in' && <Chip tone="info">Walk-in</Chip>}
                     <Chip tone={active ? 'warning' : (STATUS_TONE[a.status] ?? 'gray')}>{active ? 'Charging' : a.status === 'checked_in' ? 'Checked in' : a.statusLabel}</Chip>
                     {lateBy > 0 && a.status === 'confirmed' && <Chip tone="danger">Late {lateBy} min</Chip>}
+                    {a.lateEta && <Chip tone="warning">On the way · ETA {a.lateEta}</Chip>}
                 </div>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
@@ -340,6 +341,11 @@ function ArrivalCard({ a, can, onCheckIn, onStart, onStop, onNoShow, onCollect, 
                 </p>
             )}
             {a.status === 'confirmed' && a.blocker && <p className="mt-3 text-xs text-muted-foreground">{a.blocker}</p>}
+            {a.status === 'confirmed' && (a.lateEta || lateBy > 0) && a.noShowAt && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                    {a.lateNote && <>“{a.lateNote}” · </>}Becomes a no-show at {a.noShowAt} if not checked in.
+                </p>
+            )}
             {a.bill && (
                 <div className={cn('mt-3 rounded-xl border p-3 text-sm', a.settlement === 'due' ? 'border-amber-500/40 bg-amber-500/5' : 'border-emerald-500/30 bg-emerald-500/5')}>
                     {a.bill.lines.map((l, i) => (

@@ -37,6 +37,21 @@ final class Messages
             'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'number' => 'Debit note number', 'amount' => 'Debit note total'],
             'mail' => ['subject' => 'Debit note {{number}} · Trans EV booking {{booking_code}}', 'action_label' => 'View booking', 'body' => "# Hello {{name}},\n\nA debit note for booking {{booking_code}} is attached. It adds ₹{{amount}} to the original invoice for the extra energy delivered, which you have paid."],
         ],
+        'booking.reminder' => [
+            'label' => 'Booking reminder before the slot (to customer)',
+            'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'station' => 'Station', 'address' => 'Station address', 'slot' => 'Date and time', 'start_time' => 'Start time', 'charger' => 'Charger', 'minutes' => 'Minutes to the slot', 'no_show_minutes' => 'Grace minutes'],
+            'mail' => ['subject' => 'Your charging slot starts in {{minutes}} minutes · {{booking_code}}', 'action_label' => 'Open booking & check-in pass', 'body' => "# Hello {{name}},\n\nYour slot at **{{station}}** ({{address}}) starts at **{{start_time}}**.\n\nCharger {{charger}}. Open your booking to show the check-in pass, or scan the QR on the charger.\n\nRunning late? Tap **I’m running late** on your booking so the station knows. If you don’t arrive within {{no_show_minutes}} minutes of the start, the slot may be released as a no-show."],
+        ],
+        'booking.starting' => [
+            'label' => 'Booking starting now (to customer)',
+            'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'station' => 'Station', 'address' => 'Station address', 'slot' => 'Date and time', 'start_time' => 'Start time', 'charger' => 'Charger', 'no_show_minutes' => 'Grace minutes'],
+            'mail' => ['subject' => 'Your charging slot has started · {{booking_code}}', 'action_label' => 'Open booking', 'body' => "# Hello {{name}},\n\nYour slot at **{{station}}** has started. Charger {{charger}} is waiting for you.\n\nIf you’re delayed, tap **I’m running late** on your booking. The slot is held for {{no_show_minutes}} minutes."],
+        ],
+        'booking.no_show' => [
+            'label' => 'Booking marked as no-show (to customer)',
+            'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'station' => 'Station', 'slot' => 'Date and time', 'grace_minutes' => 'Grace given', 'percent' => 'Refund %', 'refund' => 'Refund amount', 'retained' => 'Amount kept'],
+            'mail' => ['subject' => 'Missed charging slot · {{booking_code}}', 'action_label' => 'View booking', 'body' => "# Hello {{name}},\n\nWe didn’t see you at **{{station}}** within {{grace_minutes}} minutes of your slot ({{slot}}), so it was released for other drivers.\n\nUnder the no-show policy you agreed to, ₹{{refund}} ({{percent}}%) is being refunded to your original payment method and ₹{{retained}} is kept.\n\nWe hope to see you again soon."],
+        ],
         'booking.trueup' => [
             'label' => 'Charging summary and final bill (to customer)',
             'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'station' => 'Station', 'kwh' => 'Energy delivered (kWh)', 'prepaid' => 'Amount prepaid', 'final' => 'Final bill', 'outcome' => 'Refund or balance sentence'],

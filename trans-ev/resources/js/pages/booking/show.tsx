@@ -1,11 +1,12 @@
 import { directionsUrl, inr } from '@/components/site/station-bits';
 import CancellationPolicyCard, { type PolicyView } from '@/components/site/cancellation-policy';
 import CheckInPass from '@/components/site/check-in-pass';
+import RunningLate from '@/components/site/running-late';
 import SiteLayout from '@/layouts/site-layout';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { AlertTriangle, ArrowLeft, BatteryCharging, CalendarDays, Car, CheckCircle2, Clock, CreditCard, FileText, LoaderCircle, MapPin, Navigation, RefreshCw, RotateCcw, ScrollText, ShieldCheck, Timer, XCircle, Zap } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, BatteryCharging, CalendarDays, Car, CheckCircle2, Clock, CreditCard, FileText, LoaderCircle, MapPin, Navigation, RefreshCw, RotateCcw, ScrollText, ShieldCheck, Timer, UserX, XCircle, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface BookingDetail {
@@ -44,6 +45,8 @@ interface BookingDetail {
     cancelledAt: string | null;
     cancelReason: string | null;
     createdAt: string;
+    late: { canNotify: boolean; holdUntil: string; eta: string | null; maxExtra: number } | null;
+    noShow: { at: string; grace: number; percent: number; refund: number; retained: number; auto: boolean } | null;
     finalBill: { kwh: number; total: number; prepaid: number; difference: number; status: string; balanceDue: number | null; outcome: string | null } | null;
 }
 
@@ -200,6 +203,16 @@ export default function BookingShow({ booking: b }: { booking: BookingDetail }) 
                     </div>
                 )}
 
+                {b.late?.canNotify && <RunningLate code={b.code} late={b.late} />}
+                {b.noShow && (
+                    <div className="flex gap-3 rounded-2xl bg-muted p-4 text-sm text-foreground">
+                        <UserX className="size-5 shrink-0 text-amber-500" />
+                        <p>
+                            Marked as a no-show on {b.noShow.at} (not checked in within {b.noShow.grace} minutes of the start). Under the policy agreed at booking,{' '}
+                            {inr(b.noShow.refund)} ({b.noShow.percent}%) is refunded and {inr(b.noShow.retained)} is kept.
+                        </p>
+                    </div>
+                )}
                 {(b.status === 'confirmed' || b.status === 'checked_in') && <CheckInPass code={b.code} chargerCode={b.charger.code} />}
 
                 <div className="grid gap-6 md:grid-cols-[1fr_340px]">

@@ -100,6 +100,21 @@ final class BookingPresenter
                 'difference' => (float) $b->trueup_amount, 'status' => $b->trueup_status, 'balanceDue' => $b->balance_due !== null ? (float) $b->balance_due : null,
                 'outcome' => \App\Services\StationLabels::trueUp($b),
             ] : null,
+            'late' => $b->status->value === 'confirmed' ? (function () use ($b) {
+                $svc = app(\App\Services\NoShowService::class);
+                $holdUntil = $svc->noShowAt($b);
+
+                return [
+                    'canNotify' => now()->gte($b->start_at->copy()->subMinutes(60)) && now()->lt($holdUntil),
+                    'holdUntil' => $holdUntil->timezone(Station::TIMEZONE)->format('g:i A'),
+                    'eta' => $b->late_eta_at?->timezone(Station::TIMEZONE)->format('g:i A'),
+                    'maxExtra' => \App\Support\BusinessRules::int('booking.late_extra_minutes'),
+                ];
+            })() : null,
+            'noShow' => ($r = \App\Models\NoShowRecord::query()->where('booking_id', $b->id)->first()) ? [
+                'at' => $r->marked_at->timezone(Station::TIMEZONE)->format('j M, g:i A'), 'grace' => $r->grace_minutes, 'percent' => $r->refund_percent,
+                'refund' => (float) $r->refund_amount, 'retained' => (float) $r->retained_amount, 'auto' => $r->method === 'auto',
+            ] : null,
             'canCancel' => $b->canBeCancelledByCustomer(),
             'canPay' => $b->isHoldActive(),
             'cancellationPolicy' => self::policy(\App\Services\Payments\RefundService::policyOf($b)),

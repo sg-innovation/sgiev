@@ -240,6 +240,15 @@ class BookingController extends Controller
         return Inertia::render('booking/show', ['booking' => BookingPresenter::detail($booking)]);
     }
 
+    /** C5: the customer tells the station they are running late. */
+    public function runningLate(Request $request, Booking $booking): RedirectResponse
+    {
+        $d = $request->validate(['minutes' => ['required', 'integer', 'min:1', 'max:240'], 'note' => ['nullable', 'string', 'max:160']]);
+        $message = app(\App\Services\NoShowService::class)->runningLate($booking, $request->user(), (int) $d['minutes'], $d['note'] ?? null);
+
+        return to_route('bookings.show', $booking)->with('success', $message);
+    }
+
     public function cancel(Request $request, Booking $booking): RedirectResponse
     {
         Gate::authorize('cancel', $booking);
