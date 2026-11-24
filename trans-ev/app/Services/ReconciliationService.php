@@ -46,6 +46,8 @@ class ReconciliationService
         'credit_note_missing' => ['label' => 'Credit note missing for a refund', 'severity' => 'medium', 'fix' => true],
         'wallet_fee_missing' => ['label' => 'Platform fee not taken from wallet', 'severity' => 'medium', 'fix' => true],
         'wallet_recharge_missing' => ['label' => 'Wallet recharge paid but not credited', 'severity' => 'critical', 'fix' => true],
+        'trueup_refund' => ['label' => 'Final-bill refund not made', 'severity' => 'high', 'fix' => true],
+        'balance_unpaid' => ['label' => 'Balance after final bill not paid', 'severity' => 'medium', 'fix' => false],
     ];
 
     /** Booking statuses that mean "the customer paid for this slot". */
@@ -84,6 +86,7 @@ class ReconciliationService
             $this->checkRefunds();
             $this->checkDocuments();
             $this->checkWallets();
+            $this->checkTrueUps();
             [$new, $cleared] = $this->record($run, $enquire);
             $this->stats += $this->dayTotals();
             $run->update([
@@ -113,6 +116,7 @@ class ReconciliationService
             'over_refunded', 'refund_stuck', 'refund_failed' => $this->checkRefunds($ex->payment_id),
             'invoice_missing', 'credit_note_missing' => $this->checkDocuments($ex->booking_id),
             'wallet_fee_missing', 'wallet_recharge_missing' => $this->checkWallets($ex->booking_id, $ex->payment_id),
+            'trueup_refund', 'balance_unpaid' => $this->checkTrueUps($ex->booking_id),
             default => null,
         };
         if (isset($this->found[$ex->fingerprint])) {
@@ -152,6 +156,9 @@ class ReconciliationService
                 break;
             case 'wallet_fee_missing':
                 $booking && app(WalletService::class)->chargeBooking($booking->load('company'), $payment);
+                break;
+            case 'trueup_refund':
+                $booking && app(TrueUpService::class)->refund($booking);
                 break;
             case 'wallet_recharge_missing':
                 $payment && app(WalletService::class)->creditRecharge($payment);
@@ -255,8 +262,8 @@ class ReconciliationService
     private function checkAmounts(?int $bookingId = null): void
     {
         Booking::query()->whereIn('status', self::PAID_STATUSES)->when($bookingId, fn ($q) => $q->whereKey($bookingId))
-            ->with(['payments' => fn ($q) => $q->where('status', Payment::SUCCESS)->orderBy('id')])
-            ->whereHas('payments', fn ($q) => $q->where('status', Payment::SUCCESS))
+            ->with(['payments' => fn ($q) => $q->where('status', Payment::SUCCESS)->where('purpose', 'booking')->reorder('id')])
+            ->whereHas('payments', fn ($q) => $q->where('status', Payment::SUCCESS)->where('purpose', 'booking'))
             ->get()->each(function (Booking $b) {
                 $p = $b->payments->first();
                 $paid = (string) ($p->paid_amount ?? $p->amount);
@@ -326,6 +333,19 @@ class ReconciliationService
                 ->whereNotIn('id', WalletTransaction::query()->where('type', 'recharge')->whereNotNull('payment_id')->select('payment_id'))
                 ->get()->each(fn (Payment $p) => $this->flag('wallet_recharge_missing', $p, null, null, "Wallet recharge {$p->merchant_txn_id} of ₹".($p->paid_amount ?? $p->amount).' was paid but not credited.', $p->paid_amount ?? $p->amount, '0.00', ['company_id' => $p->payer_company_id]));
         }
+    }
+
+    /** Prepaid bookings whose final-bill refund did not go through, and balances not collected after a day. */
+    private function checkTrueUps(?int $bookingId = null): void
+    {
+        Booking::query()->whereIn('trueup_status', ['refund_pending', 'refund_failed'])->when($bookingId, fn ($q) => $q->whereKey($bookingId))
+            ->where('updated_at', '<', now()->subMinutes(BusinessRules::int('reconciliation.pending_minutes')))
+            ->get()->each(fn (Booking $b) => $this->flag('trueup_refund', null, $b, null,
+                "Final bill for {$b->code} owes the customer ₹".ltrim((string) $b->trueup_amount, '-').' but the refund was not made.', ltrim((string) $b->trueup_amount, '-'), '0.00'));
+        Booking::query()->where('source', 'online')->where('settlement', 'due')->where('balance_due', '>', 0)->when($bookingId, fn ($q) => $q->whereKey($bookingId))
+            ->where('updated_at', '<', now()->subDay())
+            ->get()->each(fn (Booking $b) => $this->flag('balance_unpaid', null, $b, null,
+                "Balance of ₹{$b->balance_due} after the final bill for {$b->code} has not been collected.", $b->balance_due, '0.00'));
     }
 
     // ── Recording ───────────────────────────────────────────────────────────────────────────────────────────

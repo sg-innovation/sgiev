@@ -86,7 +86,7 @@ class PaymentController extends Controller
     public function receipt(Request $request, Booking $booking): \Inertia\Response|\Illuminate\Http\RedirectResponse
     {
         Gate::authorize('view', $booking);
-        $payment = $booking->payments()->where('status', Payment::SUCCESS)->latest('paid_at')->first();
+        $payment = $booking->payments()->where('status', Payment::SUCCESS)->where('purpose', 'booking')->latest('paid_at')->first();
         if (! $payment) {
             // No successful online payment, so there is nothing to give a receipt for.
             $message = 'There is no payment receipt for this booking because no online payment was recorded.';

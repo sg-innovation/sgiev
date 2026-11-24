@@ -27,7 +27,7 @@ interface BookingDetail {
     batteryTo: number;
     vehicleSnapshot: { make: string; model: string; registration_no: string; battery_kwh: string };
     invoice: { number: string; date: string; total: number; url: string } | null;
-    creditNotes: { number: string; date: string; total: number; url: string }[];
+    creditNotes: { title: string; number: string; date: string; total: number; url: string }[];
     customer: { name: string; email: string; phone: string; gstin: string | null };
     amounts: {
         kwh: number; ratePerKwh: number; energy: number; sessionFee: number; discount: number; couponCode: string | null; parking: number; lines: { type: string; label: string; qty: number; unit: string; rate: number; amount: number }[]; taxable: number; gstRate: number;
@@ -44,6 +44,7 @@ interface BookingDetail {
     cancelledAt: string | null;
     cancelReason: string | null;
     createdAt: string;
+    finalBill: { kwh: number; total: number; prepaid: number; difference: number; status: string; balanceDue: number | null; outcome: string | null } | null;
 }
 
 function useCountdown(iso: string | null) {
@@ -225,6 +226,34 @@ export default function BookingShow({ booking: b }: { booking: BookingDetail }) 
                             </div>
                         </section>
 
+                        {b.finalBill && (
+                            <section className="rounded-3xl border border-border bg-card p-6">
+                                <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-foreground">
+                                    <Zap className="size-5 text-volt-600" /> Final bill
+                                </h2>
+                                <p className="mt-1 text-sm text-muted-foreground">Re-calculated with the energy your vehicle actually received.</p>
+                                <dl className="mt-4 grid grid-cols-3 gap-3 text-center">
+                                    <div className="rounded-2xl bg-muted p-3">
+                                        <dt className="text-xs text-muted-foreground">Energy delivered</dt>
+                                        <dd className="font-display text-lg font-bold text-foreground">{b.finalBill.kwh.toFixed(2)} kWh</dd>
+                                    </div>
+                                    <div className="rounded-2xl bg-muted p-3">
+                                        <dt className="text-xs text-muted-foreground">Final bill</dt>
+                                        <dd className="font-display text-lg font-bold text-foreground">{inr(b.finalBill.total)}</dd>
+                                    </div>
+                                    <div className="rounded-2xl bg-muted p-3">
+                                        <dt className="text-xs text-muted-foreground">You prepaid</dt>
+                                        <dd className="font-display text-lg font-bold text-foreground">{inr(b.finalBill.prepaid)}</dd>
+                                    </div>
+                                </dl>
+                                {b.finalBill.outcome && (
+                                    <p className={cn('mt-4 rounded-2xl p-3 text-sm font-medium', b.finalBill.status === 'due' ? 'bg-amber-500/10 text-amber-800 dark:text-amber-200' : 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-200')}>
+                                        {b.finalBill.status === 'due' ? `A balance of ${inr(b.finalBill.balanceDue ?? 0)} is due for the extra energy. Please pay at the station.` : b.finalBill.outcome.replace('by the operator (nothing to collect)', '— nothing more to pay')}
+                                    </p>
+                                )}
+                            </section>
+                        )}
+
                         {b.payment?.status === 'success' && (
                             <section className="rounded-3xl border border-emerald-500/30 bg-emerald-500/5 p-6">
                                 <div className="flex flex-wrap items-start justify-between gap-4">
@@ -260,7 +289,7 @@ export default function BookingShow({ booking: b }: { booking: BookingDetail }) 
                                         {b.creditNotes.map((c) => (
                                             <a key={c.number} href={c.url} target="_blank" rel="noopener" className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2 hover:text-foreground">
                                                 <span className="text-muted-foreground">
-                                                    Credit note <span className="font-mono font-semibold text-foreground">{c.number}</span> · {c.date}
+                                                    {c.title} <span className="font-mono font-semibold text-foreground">{c.number}</span> · {c.date}
                                                 </span>
                                                 <span className="font-semibold text-emerald-700 dark:text-emerald-400">− {inr(c.total)}</span>
                                             </a>

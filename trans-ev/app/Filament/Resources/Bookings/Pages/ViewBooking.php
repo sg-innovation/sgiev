@@ -34,6 +34,17 @@ class ViewBooking extends ViewRecord
                         Notification::make()->danger()->title(collect($e->errors())->flatten()->first())->send();
                     }
                 }),
+            Action::make('retryTrueUp')->label('Retry final-bill refund')->icon('heroicon-m-arrow-path')->color('warning')
+                ->visible(fn (Booking $record) => in_array($record->trueup_status, ['refund_failed', 'refund_pending'], true) && auth()->user()->can('payments.refund')
+                    && \App\Support\Tenancy::owns($record->company_id))
+                ->requiresConfirmation()
+                ->modalDescription(fn (Booking $record) => 'Refund ₹'.ltrim((string) $record->trueup_amount, '-').' for energy not delivered.')
+                ->action(function (Booking $record) {
+                    app(\App\Services\TrueUpService::class)->refund($record);
+                    $record->refresh()->trueup_status === 'refunded'
+                        ? Notification::make()->success()->title('Refund started')->send()
+                        : Notification::make()->danger()->title('Refund failed again')->body('Check the payment gateway status.')->send();
+                }),
             Action::make('noShow')->label('Mark no-show')->icon('heroicon-m-user-minus')->color('warning')
                 ->visible(fn (Booking $record) => auth()->user()->can('staffCancel', $record) && $record->status->value === 'confirmed'
                     && now()->gte($record->start_at->copy()->addMinutes(\App\Support\BusinessRules::int('booking.no_show_minutes'))))

@@ -77,6 +77,9 @@ class ChargingSessionService
                 'connector_id' => $connector->id, 'booking_id' => $booking->id, 'source' => 'manual', 'status' => 'active',
                 'started_at' => now(), 'meter_start_kwh' => $this->reading($meterStart, 'meter_start'), 'started_by' => $by->id,
             ]);
+            if ($session->meter_start_kwh !== null) {
+                $session->meterValues()->create(['measured_at' => now(), 'register_kwh' => $session->meter_start_kwh, 'energy_kwh' => '0', 'context' => 'start', 'recorded_by' => $by->id]);
+            }
             $this->connectors->setLive($connector, ConnectorLiveStatus::Charging, 'staff', 'Session started: '.$booking->code, $by->id);
             activity()->performedOn($booking)->causedBy($by)->log('charging started');
 
@@ -97,7 +100,7 @@ class ChargingSessionService
             throw ValidationException::withMessages(['reason' => 'Choose why charging stopped.']);
         }
 
-        return DB::transaction(function () use ($session, $by, $meterStop, $energy, $reason, $note) {
+        $stopped = DB::transaction(function () use ($session, $by, $meterStop, $energy, $reason, $note) {
             /** @var ChargingSession $s */
             $s = ChargingSession::query()->whereKey($session->id)->lockForUpdate()->firstOrFail();
             if ($s->status !== 'active') {
@@ -141,8 +144,43 @@ class ChargingSessionService
                     'Session stopped: '.ChargingSession::STOP_REASONS[$reason], $by->id);
             }
 
+            $s->meterValues()->create(['measured_at' => now(), 'register_kwh' => $stopReading, 'energy_kwh' => $kwh, 'context' => 'stop', 'recorded_by' => $by->id]);
+
             return $s->fresh();
         });
+
+        // Prepaid bookings: final bill against the energy delivered (refund the difference / balance due).
+        if ($stopped->status === 'completed' && $stopped->booking_id && ($booking = Booking::query()->find($stopped->booking_id)) && $booking->source !== 'walk_in') {
+            app(TrueUpService::class)->settle($booking, $stopped);
+        }
+
+        return $stopped;
+    }
+
+    /** An interim reading during the session (meter register, or kWh shown on the charger), with optional power and SoC. */
+    public function addReading(ChargingSession $session, User $by, ?string $register, ?string $energy, ?string $power, ?int $soc): void
+    {
+        if (! self::worksAt($by, $session->station_id) || ! $by->can('sessions.manage')) {
+            throw ValidationException::withMessages(['session' => 'You can’t record readings at this station.']);
+        }
+        if ($session->status !== 'active') {
+            throw ValidationException::withMessages(['session' => 'This session has already stopped.']);
+        }
+        $reg = $this->reading($register, 'register');
+        $kwh = $this->reading($energy, 'energy');
+        if ($reg !== null && $session->meter_start_kwh !== null) {
+            if (bccomp($reg, (string) $session->meter_start_kwh, 3) < 0) {
+                throw ValidationException::withMessages(['register' => 'Lower than the start reading ('.$session->meter_start_kwh.' kWh).']);
+            }
+            $kwh = bcsub($reg, (string) $session->meter_start_kwh, 3);
+        }
+        if ($reg === null && $kwh === null && $power === null && $soc === null) {
+            throw ValidationException::withMessages(['register' => 'Enter at least one reading.']);
+        }
+        $session->meterValues()->create([
+            'measured_at' => now(), 'register_kwh' => $reg, 'energy_kwh' => $kwh, 'power_kw' => $power !== null && $power !== '' ? number_format((float) $power, 2, '.', '') : null,
+            'soc' => $soc, 'context' => 'sample', 'recorded_by' => $by->id,
+        ]);
     }
 
     private function reading(?string $value, string $field): ?string

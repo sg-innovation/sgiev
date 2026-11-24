@@ -32,6 +32,16 @@ final class Messages
             'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'number' => 'Credit note number', 'amount' => 'Credit note total'],
             'mail' => ['subject' => 'Credit note {{number}} · Trans EV booking {{booking_code}}', 'action_label' => 'View booking', 'body' => "# Hello {{name}},\n\nA credit note for booking {{booking_code}} is attached. It reverses ₹{{amount}} of the original invoice because of a refund."],
         ],
+        'gst.debit_note' => [
+            'label' => 'GST debit note issued (to customer)',
+            'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'number' => 'Debit note number', 'amount' => 'Debit note total'],
+            'mail' => ['subject' => 'Debit note {{number}} · Trans EV booking {{booking_code}}', 'action_label' => 'View booking', 'body' => "# Hello {{name}},\n\nA debit note for booking {{booking_code}} is attached. It adds ₹{{amount}} to the original invoice for the extra energy delivered, which you have paid."],
+        ],
+        'booking.trueup' => [
+            'label' => 'Charging summary and final bill (to customer)',
+            'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'station' => 'Station', 'kwh' => 'Energy delivered (kWh)', 'prepaid' => 'Amount prepaid', 'final' => 'Final bill', 'outcome' => 'Refund or balance sentence'],
+            'mail' => ['subject' => 'Your charging summary · {{booking_code}}', 'action_label' => 'View booking', 'body' => "# Hello {{name}},\n\nThanks for charging at {{station}}. Your vehicle received **{{kwh}} kWh**.\n\n- Prepaid: ₹{{prepaid}}\n- Final bill for the energy delivered: ₹{{final}}\n\n{{outcome}}"],
+        ],
         'partner.approved' => [
             'label' => 'Partner company approved',
             'vars' => ['name' => 'Recipient name', 'company' => 'Company name'],

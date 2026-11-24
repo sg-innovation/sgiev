@@ -19,7 +19,7 @@ class RefundService
 
     public function successfulPayment(Booking $booking): ?Payment
     {
-        return $booking->payments()->where('status', Payment::SUCCESS)->latest('paid_at')->first();
+        return $booking->payments()->where('status', Payment::SUCCESS)->where('purpose', 'booking')->latest('paid_at')->first();
     }
 
     /**

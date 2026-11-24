@@ -63,6 +63,11 @@ class ChargingSession extends Model
         return $this->belongsTo(User::class, 'stopped_by');
     }
 
+    public function meterValues(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ChargingMeterValue::class)->orderBy('measured_at');
+    }
+
     public function minutes(): int
     {
         return (int) $this->started_at->diffInMinutes($this->stopped_at ?? now(), true);

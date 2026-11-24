@@ -80,9 +80,10 @@ class StaffConsoleController extends Controller
     public function collect(Request $request, Booking $booking): RedirectResponse
     {
         $data = $request->validate(['method' => ['required', 'string'], 'reference' => ['nullable', 'string', 'max:30']]);
+        $due = \App\Services\WalkInService::amountDue($booking);
         app(\App\Services\WalkInService::class)->collect($booking, $data['method'], $data['reference'] ?? null, $request->user());
 
-        return back()->with('success', '₹'.number_format((float) $booking->total_amount, 2)." received for {$booking->code}. GST invoice issued.");
+        return back()->with('success', '₹'.number_format((float) $due, 2)." received for {$booking->code}. ".($booking->source === 'walk_in' ? 'GST invoice issued.' : 'GST debit note issued.'));
     }
 
     public function paymentLink(Request $request, Booking $booking): \Illuminate\Http\JsonResponse
@@ -111,6 +112,16 @@ class StaffConsoleController extends Controller
         return [
             'connectors' => $connectors, 'durations' => [30, 45, 60, 90, 120, 180],
         ];
+    }
+
+    public function reading(Request $request, ChargingSession $session): RedirectResponse
+    {
+        $d = $request->validate(['register' => ['nullable', 'numeric', 'min:0'], 'energy' => ['nullable', 'numeric', 'min:0', 'max:10000'],
+            'power' => ['nullable', 'numeric', 'min:0', 'max:1000'], 'soc' => ['nullable', 'integer', 'min:0', 'max:100']]);
+        $this->sessions->addReading($session, $request->user(), isset($d['register']) ? (string) $d['register'] : null, isset($d['energy']) ? (string) $d['energy'] : null,
+            isset($d['power']) ? (string) $d['power'] : null, isset($d['soc']) ? (int) $d['soc'] : null);
+
+        return back()->with('success', 'Reading saved.');
     }
 
     public function scan(Request $request): RedirectResponse
@@ -200,16 +211,25 @@ class StaffConsoleController extends Controller
                     'blocker' => $b->status === BookingStatus::Confirmed ? $this->checkIns->blocker($b) : null,
                     'source' => $b->source, 'settlement' => $b->settlement,
                     'bill' => $b->source === 'walk_in' && $b->status === BookingStatus::Completed ? [
-                        'total' => (float) $b->total_amount, 'taxable' => (float) $b->taxable_amount, 'tax' => (float) $b->cgst_amount + (float) $b->sgst_amount + (float) $b->igst_amount,
+                        'kind' => 'walk_in', 'total' => (float) $b->total_amount, 'due' => (float) $b->total_amount, 'taxable' => (float) $b->taxable_amount,
+                        'tax' => (float) $b->cgst_amount + (float) $b->sgst_amount + (float) $b->igst_amount,
                         'lines' => collect($b->price_lines ?? [])->map(fn ($l) => ['label' => $l['label'], 'qty' => (float) $l['qty'], 'unit' => $l['unit'], 'amount' => (float) $l['amount']])->values(),
-                        'paidBy' => ($p = $b->payments->firstWhere('status', \App\Models\Payment::SUCCESS)) ? $p->payment_mode.($p->bank_rrn ? ' · '.$p->bank_rrn : '') : null,
+                        'paidBy' => ($p = $b->payments->where('purpose', 'booking')->firstWhere('status', \App\Models\Payment::SUCCESS)) ? $p->payment_mode.($p->bank_rrn ? ' · '.$p->bank_rrn : '') : null,
+                        'invoiceUrl' => $b->invoice ? route('bookings.invoice', $b) : null, 'prepaid' => null, 'outcome' => null,
+                    ] : ($b->trueup_status !== null ? [
+                        'kind' => 'final', 'total' => (float) $b->final_total, 'due' => (float) ($b->balance_due ?? 0), 'prepaid' => (float) $b->total_amount,
+                        'taxable' => null, 'tax' => null,
+                        'lines' => collect($b->final_lines ?? [])->map(fn ($l) => ['label' => $l['label'], 'qty' => (float) $l['qty'], 'unit' => $l['unit'], 'amount' => (float) $l['amount']])->values(),
+                        'outcome' => \App\Services\StationLabels::trueUp($b),
+                        'paidBy' => ($p = $b->payments->where('status', \App\Models\Payment::SUCCESS)->firstWhere('purpose', 'balance')) ? $p->payment_mode.($p->bank_rrn ? ' · '.$p->bank_rrn : '') : null,
                         'invoiceUrl' => $b->invoice ? route('bookings.invoice', $b) : null,
-                    ] : null,
+                    ] : null),
                     'canNoShow' => $b->status === BookingStatus::Confirmed && now()->gte($b->start_at->copy()->addMinutes($noShow)) && $user->can('staffCancel', $b),
                     'session' => $s ? [
                         'uuid' => $s->uuid, 'status' => $s->status, 'startedAt' => $s->started_at->timezone($tz)->format('g:i A'), 'startedIso' => $s->started_at->toIso8601String(),
                         'meterStart' => $s->meter_start_kwh !== null ? (float) $s->meter_start_kwh : null, 'energy' => $s->energy_kwh !== null ? (float) $s->energy_kwh : null,
                         'minutes' => $s->minutes(),
+                        'lastReading' => ($m = $s->meterValues()->latest('measured_at')->first()) ? ['at' => $m->measured_at->timezone($tz)->format('g:i A'), 'kwh' => $m->energy_kwh !== null ? (float) $m->energy_kwh : null, 'soc' => $m->soc, 'power' => $m->power_kw !== null ? (float) $m->power_kw : null] : null,
                     ] : null,
                 ];
             })->values()->all();

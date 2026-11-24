@@ -66,6 +66,7 @@ final class BookingPresenter
                 'url' => route('bookings.invoice', $b),
             ] : null,
             'creditNotes' => $b->creditNotes->map(fn (\App\Models\CreditNote $c) => [
+                'title' => $c->title(),
                 'number' => $c->number,
                 'date' => $c->issued_at->setTimezone(\App\Models\Station::TIMEZONE)->format('j M Y'),
                 'total' => (float) $c->total,
@@ -94,11 +95,16 @@ final class BookingPresenter
                 'version' => $b->ruleAcceptance->version,
                 'acceptedAt' => $b->ruleAcceptance->accepted_at->setTimezone(Station::TIMEZONE)->format('j M Y, g:i A'),
             ] : null,
+            'finalBill' => $b->trueup_status !== null ? [
+                'kwh' => (float) $b->final_kwh, 'total' => (float) $b->final_total, 'prepaid' => (float) $b->total_amount,
+                'difference' => (float) $b->trueup_amount, 'status' => $b->trueup_status, 'balanceDue' => $b->balance_due !== null ? (float) $b->balance_due : null,
+                'outcome' => \App\Services\StationLabels::trueUp($b),
+            ] : null,
             'canCancel' => $b->canBeCancelledByCustomer(),
             'canPay' => $b->isHoldActive(),
             'cancellationPolicy' => self::policy(\App\Services\Payments\RefundService::policyOf($b)),
             'cancelQuote' => $b->canBeCancelledByCustomer() ? self::money(app(\App\Services\Payments\RefundService::class)->quote($b)) : null,
-            'payment' => ($p = $b->payments()->whereIn('status', ['success', 'pending'])->first()) ? [
+            'payment' => ($p = $b->payments()->where('purpose', 'booking')->whereIn('status', ['success', 'pending'])->first()) ? [
                 'status' => $p->status,
                 'amount' => (float) ($p->paid_amount ?? $p->amount),
                 'mode' => $p->payment_mode,

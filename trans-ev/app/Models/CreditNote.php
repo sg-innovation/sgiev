@@ -38,6 +38,16 @@ class CreditNote extends Model
         static::deleting(fn () => throw new LogicException('Credit notes cannot be deleted.'));
     }
 
+    public function isDebit(): bool
+    {
+        return $this->note_type === 'debit';
+    }
+
+    public function title(): string
+    {
+        return $this->isDebit() ? 'Debit note' : 'Credit note';
+    }
+
     public function getRouteKeyName(): string
     {
         return 'uuid';

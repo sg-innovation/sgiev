@@ -19,14 +19,19 @@ class GstDocumentIssued extends Notification
 
     public function via(object $notifiable): array
     {
-        return Messages::enabled($this->doc instanceof Invoice ? 'gst.invoice' : 'gst.credit_note') ? ['mail'] : [];
+        return Messages::enabled($this->template()) ? ['mail'] : [];
+    }
+
+    private function template(): string
+    {
+        return $this->doc instanceof Invoice ? 'gst.invoice' : ($this->doc->isDebit() ? 'gst.debit_note' : 'gst.credit_note');
     }
 
     public function toMail(object $notifiable): MailMessage
     {
         $booking = $this->doc->booking;
 
-        return Messages::mail($this->doc instanceof Invoice ? 'gst.invoice' : 'gst.credit_note', [
+        return Messages::mail($this->template(), [
             'name' => $notifiable->name ?? '',
             'booking_code' => $booking->code,
             'number' => $this->doc->number,

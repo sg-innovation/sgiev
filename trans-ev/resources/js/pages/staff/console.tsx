@@ -2,17 +2,17 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { cn } from '@/lib/utils';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
-    AlertTriangle, Banknote, BatteryCharging, Camera, Car, CheckCircle2, Clock, FileText, LayoutDashboard, LoaderCircle, Phone, Play, PlugZap, Plus, QrCode, RefreshCw, Smartphone, Square, UserX, X, Zap,
+    AlertTriangle, Banknote, BatteryCharging, Gauge, Camera, Car, CheckCircle2, Clock, FileText, LayoutDashboard, LoaderCircle, Phone, Play, PlugZap, Plus, QrCode, RefreshCw, Smartphone, Square, UserX, X, Zap,
 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 
-interface Session { uuid: string; status: string; startedAt: string; startedIso: string; meterStart: number | null; energy: number | null; minutes: number }
+interface Session { uuid: string; status: string; startedAt: string; startedIso: string; meterStart: number | null; energy: number | null; minutes: number; lastReading: { at: string; kwh: number | null; soc: number | null; power: number | null } | null }
 interface Arrival {
     code: string; status: string; statusLabel: string; start: string; end: string; startIso: string; endIso: string;
     customer: string | null; phone: string | null; vehicle: string; registration: string | null; charger: string | null; connector: string | null;
     batteryFrom: number; batteryTo: number; estKwh: number; checkedInAt: string | null; blocker: string | null; canNoShow: boolean; session: Session | null;
     source: string; settlement: string | null;
-    bill: { total: number; taxable: number; tax: number; lines: { label: string; qty: number; unit: string; amount: number }[]; paidBy: string | null; invoiceUrl: string | null } | null;
+    bill: { kind: 'walk_in' | 'final'; total: number; due: number; prepaid: number | null; outcome: string | null; taxable: number | null; tax: number | null; lines: { label: string; qty: number; unit: string; amount: number }[]; paidBy: string | null; invoiceUrl: string | null } | null;
 }
 interface WalkInOptions {
     connectors: { id: number; label: string; type: string; powerKw: number; maxMinutes: number; freeUntil: string | null; price: string | null }[];
@@ -69,6 +69,7 @@ export default function StaffConsole(props: Props) {
     const [statusFor, setStatusFor] = useState<ConnectorRow | null>(null);
     const [walkInOpen, setWalkInOpen] = useState(false);
     const [collectFor, setCollectFor] = useState<Arrival | null>(null);
+    const [readingFor, setReadingFor] = useState<{ uuid: string; label: string; meterStart: number | null } | null>(null);
     const [toast, setToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -167,7 +168,7 @@ export default function StaffConsole(props: Props) {
 
                 {counts.unpaid > 0 && (
                     <p className="flex items-center gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-800 dark:text-amber-200">
-                        <Banknote className="size-5" /> {counts.unpaid} walk-in{counts.unpaid > 1 ? 's' : ''} waiting for payment
+                        <Banknote className="size-5" /> {counts.unpaid} {counts.unpaid > 1 ? 'drivers' : 'driver'} still to pay at the station
                     </p>
                 )}
 
@@ -190,6 +191,7 @@ export default function StaffConsole(props: Props) {
                                     onStart={() => setStartFor(a)}
                                     onStop={() => a.session && setStopFor({ uuid: a.session.uuid, label: `${a.code} · ${a.registration ?? ''}`, meterStart: a.session.meterStart, startedIso: a.session.startedIso })}
                                     onCollect={() => setCollectFor(a)}
+                                    onReading={() => a.session && setReadingFor({ uuid: a.session.uuid, label: `${a.code} · ${a.registration ?? ''}`, meterStart: a.session.meterStart })}
                                     onNoShow={() => confirm(`Mark ${a.code} as a no-show? The customer gets the no-show refund agreed at booking.`) && post(`/staff/bookings/${a.code}/no-show`)}
                                 />
                             ))
@@ -241,6 +243,7 @@ export default function StaffConsole(props: Props) {
             <StatusSheet k={statusFor} statuses={props.manualStatuses} onClose={() => setStatusFor(null)} />
             {props.walkIn && <WalkInSheet open={walkInOpen} options={props.walkIn} onClose={() => setWalkInOpen(false)} />}
             <CollectSheet a={collectFor} onClose={() => setCollectFor(null)} />
+            <ReadingSheet s={readingFor} onClose={() => setReadingFor(null)} />
         </div>
     );
 }
@@ -258,7 +261,7 @@ function Chip({ tone, children }: { tone: string; children: ReactNode }) {
     return <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1', TONE[tone] ?? TONE.gray)}>{children}</span>;
 }
 
-function ArrivalCard({ a, can, onCheckIn, onStart, onStop, onNoShow, onCollect }: { a: Arrival; can: Props['can']; onCheckIn: () => void; onStart: () => void; onStop: () => void; onNoShow: () => void; onCollect: () => void }) {
+function ArrivalCard({ a, can, onCheckIn, onStart, onStop, onNoShow, onCollect, onReading }: { a: Arrival; can: Props['can']; onCheckIn: () => void; onStart: () => void; onStop: () => void; onNoShow: () => void; onCollect: () => void; onReading: () => void }) {
     const now = useNow(15_000);
     const lateBy = a.status === 'confirmed' ? Math.floor((now - new Date(a.startIso).getTime()) / 60000) : 0;
     const active = a.session?.status === 'active';
@@ -323,6 +326,14 @@ function ArrivalCard({ a, can, onCheckIn, onStart, onStop, onNoShow, onCollect }
                     {a.session.meterStart !== null && <span className="text-xs">· meter {a.session.meterStart}</span>}
                 </p>
             )}
+            {active && a.session?.lastReading && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                    Last reading {a.session.lastReading.at}
+                    {a.session.lastReading.kwh !== null && ` · ${a.session.lastReading.kwh.toFixed(2)} kWh`}
+                    {a.session.lastReading.power !== null && ` · ${a.session.lastReading.power} kW`}
+                    {a.session.lastReading.soc !== null && ` · ${a.session.lastReading.soc}% battery`}
+                </p>
+            )}
             {a.status === 'completed' && a.session?.energy !== null && a.session && (
                 <p className="mt-3 flex items-center gap-2 rounded-xl bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-200">
                     <CheckCircle2 className="size-4" /> {a.session.energy?.toFixed(2)} kWh in {a.session.minutes} min
@@ -330,7 +341,7 @@ function ArrivalCard({ a, can, onCheckIn, onStart, onStop, onNoShow, onCollect }
             )}
             {a.status === 'confirmed' && a.blocker && <p className="mt-3 text-xs text-muted-foreground">{a.blocker}</p>}
             {a.bill && (
-                <div className={cn('mt-3 rounded-xl border p-3 text-sm', a.settlement === 'paid' ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/40 bg-amber-500/5')}>
+                <div className={cn('mt-3 rounded-xl border p-3 text-sm', a.settlement === 'due' ? 'border-amber-500/40 bg-amber-500/5' : 'border-emerald-500/30 bg-emerald-500/5')}>
                     {a.bill.lines.map((l, i) => (
                         <div key={i} className="flex justify-between gap-2 text-muted-foreground">
                             <span>
@@ -339,14 +350,30 @@ function ArrivalCard({ a, can, onCheckIn, onStart, onStop, onNoShow, onCollect }
                             <span className="tabular-nums">₹{l.amount.toFixed(2)}</span>
                         </div>
                     ))}
-                    <div className="flex justify-between gap-2 text-muted-foreground">
-                        <span>GST</span>
-                        <span className="tabular-nums">₹{a.bill.tax.toFixed(2)}</span>
-                    </div>
-                    <div className="mt-1 flex justify-between gap-2 border-t border-border pt-1 text-base font-bold">
-                        <span>{a.settlement === 'paid' ? 'Paid' : 'To pay'}</span>
-                        <span className="tabular-nums">₹{a.bill.total.toFixed(2)}</span>
-                    </div>
+                    {a.bill.tax !== null && (
+                        <div className="flex justify-between gap-2 text-muted-foreground">
+                            <span>GST</span>
+                            <span className="tabular-nums">₹{a.bill.tax.toFixed(2)}</span>
+                        </div>
+                    )}
+                    {a.bill.kind === 'final' ? (
+                        <>
+                            <div className="mt-1 flex justify-between gap-2 border-t border-border pt-1 font-semibold">
+                                <span>Final bill (incl. GST)</span>
+                                <span className="tabular-nums">₹{a.bill.total.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between gap-2 text-muted-foreground">
+                                <span>Prepaid</span>
+                                <span className="tabular-nums">₹{a.bill.prepaid?.toFixed(2)}</span>
+                            </div>
+                            {a.bill.outcome && <p className="mt-1 text-xs font-medium text-foreground">{a.bill.outcome}</p>}
+                        </>
+                    ) : (
+                        <div className="mt-1 flex justify-between gap-2 border-t border-border pt-1 text-base font-bold">
+                            <span>{a.settlement === 'paid' ? 'Paid' : 'To pay'}</span>
+                            <span className="tabular-nums">₹{a.bill.total.toFixed(2)}</span>
+                        </div>
+                    )}
                     {a.bill.paidBy && <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">{a.bill.paidBy}</p>}
                 </div>
             )}
@@ -367,9 +394,14 @@ function ArrivalCard({ a, can, onCheckIn, onStart, onStop, onNoShow, onCollect }
                         Stop charging
                     </Action>
                 )}
+                {active && can.sessions && (
+                    <Action onClick={onReading} icon={<Gauge className="size-4" />}>
+                        Add reading
+                    </Action>
+                )}
                 {a.bill && a.settlement === 'due' && can.walkIns && (
                     <Action onClick={onCollect} primary icon={<Banknote className="size-4" />}>
-                        Take payment
+                        Take payment · ₹{a.bill.due.toFixed(2)}
                     </Action>
                 )}
                 {a.bill?.invoiceUrl && (
@@ -870,7 +902,7 @@ function CollectSheet({ a, onClose }: { a: Arrival | null; onClose: () => void }
         <Sheet open={!!a} onOpenChange={(o) => !o && onClose()}>
             <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-3xl">
                 <SheetHeader>
-                    <SheetTitle>Take payment · ₹{a?.bill?.total.toFixed(2)}</SheetTitle>
+                    <SheetTitle>Take payment · ₹{a?.bill?.due.toFixed(2)}</SheetTitle>
                     <SheetDescription>
                         {a?.code} · {a?.registration} · {a?.session?.energy?.toFixed(2)} kWh
                     </SheetDescription>
@@ -901,11 +933,11 @@ function CollectSheet({ a, onClose }: { a: Arrival | null; onClose: () => void }
                                     <FieldError name="reference" />
                                 </div>
                             )}
-                            {method === 'cash' && <p className="rounded-xl bg-muted p-3 text-sm text-muted-foreground">Count the cash before you confirm. The GST invoice is issued straight away.</p>}
+                            {method === 'cash' && <p className="rounded-xl bg-muted p-3 text-sm text-muted-foreground">Count the cash before you confirm. The GST {a?.bill?.kind === 'final' ? 'debit note' : 'invoice'} is issued straight away.</p>}
                             <FieldError name="method" />
                             <button type="submit" disabled={form.processing} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
                                 {form.processing ? <LoaderCircle className="size-5 animate-spin" /> : <CheckCircle2 className="size-5" />}
-                                {method === 'cash' ? 'Cash received' : 'UPI payment received'} · ₹{a?.bill?.total.toFixed(2)}
+                                {method === 'cash' ? 'Cash received' : 'UPI payment received'} · ₹{a?.bill?.due.toFixed(2)}
                             </button>
                         </form>
                     ) : link ? (
@@ -928,6 +960,55 @@ function CollectSheet({ a, onClose }: { a: Arrival | null; onClose: () => void }
                         </div>
                     )}
                 </div>
+            </SheetContent>
+        </Sheet>
+    );
+}
+
+function ReadingSheet({ s, onClose }: { s: { uuid: string; label: string; meterStart: number | null } | null; onClose: () => void }) {
+    const form = useForm({ register: '', energy: '', power: '', soc: '' });
+    useEffect(() => form.reset(), [s?.uuid]); // eslint-disable-line react-hooks/exhaustive-deps
+    const input = 'mt-1 h-11 w-full rounded-xl border border-border bg-background px-3 font-mono';
+    return (
+        <Sheet open={!!s} onOpenChange={(o) => !o && onClose()}>
+            <SheetContent side="bottom" className="rounded-t-3xl">
+                <SheetHeader>
+                    <SheetTitle>Add a reading</SheetTitle>
+                    <SheetDescription>{s?.label}. Fill in what the charger or car shows.</SheetDescription>
+                </SheetHeader>
+                <form
+                    className="grid grid-cols-2 gap-3 px-4 pb-6"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        form.post(`/staff/sessions/${s?.uuid}/reading`, { preserveScroll: true, onSuccess: onClose });
+                    }}
+                >
+                    {s?.meterStart !== null ? (
+                        <div className="col-span-2">
+                            <label htmlFor="rd-register" className="text-sm font-medium">Meter reading (kWh)</label>
+                            <input id="rd-register" inputMode="decimal" value={form.data.register} onChange={(e) => form.setData('register', e.target.value)} className={input} />
+                            <FieldError name="register" />
+                        </div>
+                    ) : (
+                        <div className="col-span-2">
+                            <label htmlFor="rd-energy" className="text-sm font-medium">Energy delivered so far (kWh)</label>
+                            <input id="rd-energy" inputMode="decimal" value={form.data.energy} onChange={(e) => form.setData('energy', e.target.value)} className={input} />
+                            <FieldError name="energy" />
+                        </div>
+                    )}
+                    <div>
+                        <label htmlFor="rd-power" className="text-sm font-medium">Power (kW)</label>
+                        <input id="rd-power" inputMode="decimal" value={form.data.power} onChange={(e) => form.setData('power', e.target.value)} className={input} />
+                    </div>
+                    <div>
+                        <label htmlFor="rd-soc" className="text-sm font-medium">Battery (%)</label>
+                        <input id="rd-soc" inputMode="numeric" value={form.data.soc} onChange={(e) => form.setData('soc', e.target.value.replace(/\D/g, ''))} maxLength={3} className={input} />
+                    </div>
+                    <FieldError name="session" />
+                    <button type="submit" disabled={form.processing} className="col-span-2 flex h-12 items-center justify-center gap-2 rounded-full bg-foreground font-semibold text-background disabled:opacity-60">
+                        {form.processing ? <LoaderCircle className="size-5 animate-spin" /> : <Gauge className="size-5" />} Save reading
+                    </button>
+                </form>
             </SheetContent>
         </Sheet>
     );

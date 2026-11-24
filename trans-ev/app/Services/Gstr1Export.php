@@ -41,7 +41,7 @@ class Gstr1Export
         }
         foreach ($cns->filter(fn (CreditNote $c) => $c->recipient_gstin === null) as $c) {
             $key = $c->place_of_supply.'|'.$rate($c->gst_rate);
-            $b2cs[$key] = bcsub($b2cs[$key] ?? '0', (string) $c->taxable_amount, 2);
+            $b2cs[$key] = $c->note_type === 'debit' ? bcadd($b2cs[$key] ?? '0', (string) $c->taxable_amount, 2) : bcsub($b2cs[$key] ?? '0', (string) $c->taxable_amount, 2);
         }
         $files['b2cs.csv'] = [['Type', 'Place Of Supply', 'Applicable % of Tax Rate', 'Rate', 'Taxable Value', 'Cess Amount', 'E-Commerce GSTIN'],
             ...$b2cs->map(function ($v, $k) use ($pos, $m) {
@@ -51,9 +51,10 @@ class Gstr1Export
             })->values()->all()];
 
         $files['cdnr.csv'] = [['GSTIN/UIN of Recipient', 'Receiver Name', 'Note Number', 'Note Date', 'Note Type', 'Place Of Supply', 'Reverse Charge', 'Note Supply Type', 'Note Value', 'Applicable % of Tax Rate', 'Rate', 'Taxable Value', 'Cess Amount'],
-            ...$cns->filter(fn (CreditNote $c) => $c->recipient_gstin !== null)->map(fn (CreditNote $c) => [$c->recipient_gstin, $c->invoice->recipient['name'] ?? '', $c->number, $date($c->issued_at), 'C', $pos($c->place_of_supply), 'N', 'Regular B2B', $m($c->total), '', $rate($c->gst_rate), $m($c->taxable_amount), '0.00'])->values()->all()];
+            ...$cns->filter(fn (CreditNote $c) => $c->recipient_gstin !== null)->map(fn (CreditNote $c) => [$c->recipient_gstin, $c->invoice->recipient['name'] ?? '', $c->number, $date($c->issued_at), $c->note_type === 'debit' ? 'D' : 'C', $pos($c->place_of_supply), 'N', 'Regular B2B', $m($c->total), '', $rate($c->gst_rate), $m($c->taxable_amount), '0.00'])->values()->all()];
 
-        $sum = fn (Collection $c, string $f) => $c->reduce(fn ($a, $x) => bcadd($a, (string) $x->{$f}, 2), '0');
+        // Signed sum: credit notes reduce, debit notes add (so "invoices − notes" stays correct).
+        $sum = fn (Collection $c, string $f) => $c->reduce(fn ($a, $x) => $x instanceof CreditNote && $x->note_type === 'debit' ? bcsub($a, (string) $x->{$f}, 2) : bcadd($a, (string) $x->{$f}, 2), '0');
         $files['hsn.csv'] = [['HSN', 'Description', 'UQC', 'Total Quantity', 'Total Value', 'Rate', 'Taxable Value', 'Integrated Tax Amount', 'Central Tax Amount', 'State/UT Tax Amount', 'Cess Amount'],
             ...$inv->groupBy(fn (Invoice $i) => $i->sac_code.'|'.$rate($i->gst_rate))->map(function (Collection $g, string $k) use ($cns, $sum, $m) {
                 [$sac, $r] = explode('|', $k);
@@ -71,7 +72,8 @@ class Gstr1Export
         $files['docs.csv'] = [['Nature of Document', 'Sr. No. From', 'Sr. No. To', 'Total Number', 'Cancelled'],
             ...array_values(array_filter([
                 $inv->isNotEmpty() ? ['Invoices for outward supply', $inv->first()->number, $inv->last()->number, $inv->count(), 0] : null,
-                $cns->isNotEmpty() ? ['Credit Note', $cns->first()->number, $cns->last()->number, $cns->count(), 0] : null,
+                ($c = $cns->where('note_type', 'credit')->values())->isNotEmpty() ? ['Credit Note', $c->first()->number, $c->last()->number, $c->count(), 0] : null,
+                ($d = $cns->where('note_type', 'debit')->values())->isNotEmpty() ? ['Debit Note', $d->first()->number, $d->last()->number, $d->count(), 0] : null,
             ]))];
 
         $path = $dir.DIRECTORY_SEPARATOR.'GSTR1-'.$gstin.'-'.$from->format('Y-m').'.zip';

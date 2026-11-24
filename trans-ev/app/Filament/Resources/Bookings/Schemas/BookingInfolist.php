@@ -160,17 +160,32 @@ class BookingInfolist
                             ->formatStateUsing(fn (Booking $r) => "{$r->place_of_supply} · SAC {$r->sac_code}"),
                     ]),
 
+                Section::make('Final bill')->icon('heroicon-o-scale')->iconColor('primary')
+                    ->description('Re-made with the energy actually delivered')
+                    ->visible(fn (Booking $r) => $r->trueup_status !== null)
+                    ->schema([
+                        TextEntry::make('final_kwh')->label('Energy delivered')->inlineLabel()->alignEnd()
+                            ->formatStateUsing(fn (Booking $r) => number_format((float) $r->final_kwh, 3).' kWh')->helperText(fn (Booking $r) => 'Booked ≈ '.number_format((float) $r->est_kwh, 2).' kWh'),
+                        TextEntry::make('final_total')->label('Final bill')->money('INR')->inlineLabel()->alignEnd()->weight(FontWeight::SemiBold),
+                        TextEntry::make('total_amount')->label('Prepaid')->money('INR')->inlineLabel()->alignEnd(),
+                        TextEntry::make('trueup_amount')->label('Difference')->inlineLabel()->alignEnd()
+                            ->formatStateUsing(fn ($state) => ((float) $state < 0 ? '− ' : '+ ').'₹'.number_format(abs((float) $state), 2))
+                            ->color(fn ($state) => (float) $state < 0 ? 'success' : 'warning'),
+                        TextEntry::make('trueup_status')->hiddenLabel()->formatStateUsing(fn (Booking $r) => \App\Services\StationLabels::trueUp($r))
+                            ->color(fn (string $state) => $state === 'refund_failed' ? 'danger' : 'gray'),
+                    ]),
+
                 Section::make('GST documents')->icon('heroicon-o-document-text')->iconColor('primary')->schema([
                     TextEntry::make('invoice.number')->label('Tax invoice')->fontFamily('mono')->weight(FontWeight::SemiBold)
                         ->placeholder(fn (Booking $r) => app(\App\Services\GstService::class)->invoiceGstin($r->station) ? 'Not issued yet' : 'Cannot issue: no GSTIN for this station’s state')
                         ->helperText(fn (Booking $r) => $r->invoice ? $r->invoice->issued_at->setTimezone(Station::TIMEZONE)->format('d M Y').' · ₹'.number_format((float) $r->invoice->total, 2).' · '.$r->invoice->supply_type : null)
                         ->url(fn (Booking $r) => $r->invoice ? route('bookings.invoice', $r) : null, shouldOpenInNewTab: true)
                         ->color(fn (Booking $r) => $r->invoice ? 'primary' : 'danger'),
-                    RepeatableEntry::make('creditNotes')->label('Credit notes')->contained(false)
+                    RepeatableEntry::make('creditNotes')->label('Credit & debit notes')->contained(false)
                         ->visible(fn (Booking $r) => $r->creditNotes->isNotEmpty())
                         ->schema([
                             TextEntry::make('number')->hiddenLabel()->fontFamily('mono')
-                                ->helperText(fn (\App\Models\CreditNote $record) => $record->issued_at->setTimezone(Station::TIMEZONE)->format('d M Y').' · − ₹'.number_format((float) $record->total, 2))
+                                ->helperText(fn (\App\Models\CreditNote $record) => $record->title().' · '.$record->issued_at->setTimezone(Station::TIMEZONE)->format('d M Y').' · '.($record->isDebit() ? '+' : '−').' ₹'.number_format((float) $record->total, 2))
                                 ->url(fn (\App\Models\CreditNote $record) => route('credit-notes.show', $record), shouldOpenInNewTab: true),
                         ]),
                 ]),
@@ -208,7 +223,7 @@ class BookingInfolist
 
     private static function paidLabel(Booking $r): string
     {
-        $paid = $r->payments->firstWhere('status', 'success');
+        $paid = $r->payments->where('purpose', 'booking')->firstWhere('status', 'success');
         if (! $paid) {
             return match ($r->status->value) {
                 'held' => 'Awaiting payment',

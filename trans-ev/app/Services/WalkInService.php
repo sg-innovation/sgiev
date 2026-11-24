@@ -159,6 +159,12 @@ class WalkInService
         ])->save();
     }
 
+    /** What the driver owes at the station: the walk-in bill, or the balance after a prepaid booking's final bill. */
+    public static function amountDue(Booking $b): string
+    {
+        return (string) ($b->source === 'walk_in' ? $b->total_amount : ($b->balance_due ?? '0'));
+    }
+
     /** Staff record cash or UPI received at the station. */
     public function collect(Booking $booking, string $method, ?string $reference, User $by): Payment
     {
@@ -176,9 +182,9 @@ class WalkInService
             $b = Booking::query()->whereKey($booking->id)->lockForUpdate()->firstOrFail();
             $this->assertDue($b);
             $payment = Payment::create([
-                'company_id' => $b->company_id, 'booking_id' => $b->id, 'user_id' => null, 'collected_by' => $by->id, 'purpose' => 'booking',
+                'company_id' => $b->company_id, 'booking_id' => $b->id, 'user_id' => $b->user_id, 'collected_by' => $by->id, 'purpose' => $b->source === 'walk_in' ? 'booking' : 'balance',
                 'gateway' => $method, 'environment' => 'offline', 'merchant_txn_id' => strtoupper($method === 'cash' ? 'CASH' : 'UPI').'-'.now()->format('ymdHis').Str::upper(Str::random(5)),
-                'amount' => $b->total_amount, 'paid_amount' => $b->total_amount, 'status' => Payment::SUCCESS, 'gateway_status' => 'SUCCESS',
+                'amount' => self::amountDue($b), 'paid_amount' => self::amountDue($b), 'status' => Payment::SUCCESS, 'gateway_status' => 'SUCCESS',
                 'payment_mode' => self::OFFLINE[$method], 'bank_rrn' => $reference ? strtoupper($reference) : null, 'paid_at' => now(), 'verified_via' => 'staff',
             ]);
             $this->markPaid($b, $payment, $by);
@@ -203,7 +209,7 @@ class WalkInService
     /** Online payment for a walk-in succeeded (called from PaymentService inside its transaction). */
     public function settleOnline(Booking $booking, Payment $payment): bool
     {
-        $amountOk = bccomp((string) ($payment->paid_amount ?? $payment->amount), (string) $booking->total_amount, 2) === 0;
+        $amountOk = bccomp((string) ($payment->paid_amount ?? $payment->amount), self::amountDue($booking), 2) === 0;
         if ($booking->settlement !== 'due' || ! $amountOk) {
             return false;
         }
@@ -214,13 +220,27 @@ class WalkInService
 
     private function assertDue(Booking $b): void
     {
-        if ($b->source !== 'walk_in' || $b->settlement !== 'due' || $b->status !== BookingStatus::Completed) {
+        if ($b->settlement !== 'due' || $b->status !== BookingStatus::Completed || bccomp(self::amountDue($b), '0', 2) <= 0) {
             throw ValidationException::withMessages(['method' => $b->settlement === 'paid' ? 'This walk-in is already paid.' : 'Stop charging first; the bill is made from the energy delivered.']);
         }
     }
 
     private function markPaid(Booking $b, Payment $payment, ?User $by): void
     {
+        if ($b->source !== 'walk_in') {
+            // Balance after the final bill: GST debit note for the extra energy.
+            $b->forceFill(['settlement' => 'paid', 'trueup_status' => 'paid'])->save();
+            activity()->performedOn($b)->causedBy($by)->withProperties(['method' => $payment->gateway, 'amount' => (string) $payment->amount])->log('balance paid');
+            DB::afterCommit(function () use ($b, $payment) {
+                try {
+                    app(InvoiceService::class)->debitNoteForPayment($payment->fresh(), 'Final bill: extra energy delivered ('.number_format((float) $b->final_kwh, 2).' kWh)');
+                } catch (\Throwable $e) {
+                    Log::error('Debit note failed', ['booking' => $b->code, 'error' => $e->getMessage()]);
+                }
+            });
+
+            return;
+        }
         $b->forceFill(['settlement' => 'paid'])->save();
         activity()->performedOn($b)->causedBy($by)->withProperties(['method' => $payment->gateway, 'amount' => (string) $payment->amount])->log('walk-in paid');
         app(WalletService::class)->chargeBooking($b->fresh('company'), $payment);

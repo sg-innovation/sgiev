@@ -117,9 +117,9 @@ class PaymentService
 
         return DB::transaction(function () use ($booking, $company, $gateway) {
             $payment = Payment::create([
-                'company_id' => $company->id, 'booking_id' => $booking->id, 'user_id' => null, 'purpose' => 'booking',
+                'company_id' => $company->id, 'booking_id' => $booking->id, 'user_id' => $booking->user_id, 'purpose' => $booking->source === 'walk_in' ? 'booking' : 'balance',
                 'environment' => $gateway->environment(), 'merchant_txn_id' => 'TEVW'.now()->format('ymdHis').Str::upper(Str::random(6)),
-                'amount' => $booking->total_amount, 'status' => Payment::CREATED,
+                'amount' => \App\Services\WalkInService::amountDue($booking), 'status' => Payment::CREATED,
             ]);
             try {
                 $session = $gateway->createSession($payment, [
@@ -293,13 +293,13 @@ class PaymentService
     {
         /** @var Booking $booking */
         $booking = Booking::query()->whereKey($payment->booking_id)->lockForUpdate()->first();
-        if ($booking->source === 'walk_in' && app(\App\Services\WalkInService::class)->settleOnline($booking, $payment)) {
+        if ($booking->settlement === 'due' && app(\App\Services\WalkInService::class)->settleOnline($booking, $payment)) {
             return;
         }
         $connector = \App\Models\Connector::query()->withTrashed()->whereKey($booking->connector_id)->lockForUpdate()->first();
 
         $amountOk = bccomp((string) ($payment->paid_amount ?? $payment->amount), (string) $booking->total_amount, 2) === 0;
-        $alreadyPaid = $booking->payments()->whereKeyNot($payment->id)->where('status', Payment::SUCCESS)->exists();
+        $alreadyPaid = $booking->payments()->whereKeyNot($payment->id)->where('status', Payment::SUCCESS)->exists() || $payment->purpose === 'balance';
         $stillBookable = in_array($booking->status, [BookingStatus::Held, BookingStatus::Expired], true)
             && $booking->start_at->isFuture()
             && $connector !== null

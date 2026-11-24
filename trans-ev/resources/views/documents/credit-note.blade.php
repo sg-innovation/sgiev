@@ -9,7 +9,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Credit note {{ $doc->number }}</title>
+    <title>{{ $doc->title() }} {{ $doc->number }}</title>
     @include('documents._styles')
 </head>
 <body>
@@ -28,10 +28,10 @@
                 <div><span class="bold">State:</span> {{ $s['state'] }} ({{ substr($doc->supplier_gstin, 0, 2) }})</div>
             </td>
             <td style="width: 42%; vertical-align: top;" class="right">
-                <h1>CREDIT NOTE</h1>
+                <h1>{{ strtoupper($doc->title()) }}</h1>
                 <div class="muted small">Issued under section 34 of the CGST Act</div>
                 <table style="margin-top: 8px;">
-                    <tr><td class="muted right">Credit note no.</td><td class="right bold mono">{{ $doc->number }}</td></tr>
+                    <tr><td class="muted right">{{ $doc->title() }} no.</td><td class="right bold mono">{{ $doc->number }}</td></tr>
                     <tr><td class="muted right">Date</td><td class="right">{{ $doc->issued_at->setTimezone($tz)->format('d M Y') }}</td></tr>
                     <tr><td class="muted right">Against invoice</td><td class="right mono">{{ $invoice->number }}</td></tr>
                     <tr><td class="muted right">Invoice date</td><td class="right">{{ $invoice->issued_at->setTimezone($tz)->format('d M Y') }}</td></tr>
@@ -90,6 +90,6 @@
         </tr>
     </table>
 
-    <div class="footer small muted">This credit note reduces the taxable value and GST of the invoice above. The refunded amount is credited to the original payment method.</div>
+    <div class="footer small muted">@if ($doc->isDebit())This debit note increases the taxable value and GST of the invoice above for the extra energy delivered.@else This credit note reduces the taxable value and GST of the invoice above. The refunded amount is credited to the original payment method.@endif</div>
 </body>
 </html>

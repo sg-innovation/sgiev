@@ -49,7 +49,7 @@ class InvoiceService
 
             return null;
         }
-        $payment ??= $booking->payments()->where('status', Payment::SUCCESS)->latest('paid_at')->first();
+        $payment ??= $booking->payments()->where('status', Payment::SUCCESS)->where('purpose', 'booking')->latest('paid_at')->first();
 
         $invoice = DB::transaction(function () use ($booking, $station, $gstin, $payment) {
             if ($existing = Invoice::where('booking_id', $booking->id)->lockForUpdate()->first()) {
@@ -143,7 +143,7 @@ class InvoiceService
         if ($refund->status !== Refund::SUCCESS || bccomp((string) $refund->amount, '0', 2) <= 0) {
             return null;
         }
-        if ($existing = CreditNote::where('refund_id', $refund->id)->first()) {
+        if ($existing = CreditNote::where('refund_id', $refund->id)->where('note_type', 'credit')->first()) {
             return $existing;
         }
         $invoice = Invoice::where('booking_id', $refund->booking_id)->first()
@@ -157,7 +157,8 @@ class InvoiceService
                 return $existing;
             }
             // Never credit more than remains on the invoice.
-            $remaining = bcsub((string) $invoice->total, (string) CreditNote::where('invoice_id', $invoice->id)->sum('total'), 2);
+            $remaining = bcsub(bcadd((string) $invoice->total, (string) CreditNote::where('invoice_id', $invoice->id)->where('note_type', 'debit')->sum('total'), 2),
+                (string) CreditNote::where('invoice_id', $invoice->id)->where('note_type', 'credit')->sum('total'), 2);
             $gross = bccomp((string) $refund->amount, $remaining, 2) > 0 ? $remaining : (string) $refund->amount;
             if (bccomp($gross, '0', 2) <= 0) {
                 return null;
@@ -185,6 +186,50 @@ class InvoiceService
             return $note;
         });
 
+        if ($note) {
+            DB::afterCommit(fn () => $this->notify($note));
+        }
+
+        return $note;
+    }
+
+    /** GST debit note (s.34(3), Rule 53) for a balance collected after charging delivered more than was prepaid. Idempotent. */
+    public function debitNoteForPayment(Payment $payment, string $reason): ?CreditNote
+    {
+        if ($payment->status !== Payment::SUCCESS || bccomp((string) ($payment->paid_amount ?? $payment->amount), '0', 2) <= 0) {
+            return null;
+        }
+        if ($existing = CreditNote::where('payment_id', $payment->id)->first()) {
+            return $existing;
+        }
+        $invoice = Invoice::where('booking_id', $payment->booking_id)->first();
+        if (! $invoice) {
+            return null;
+        }
+        $note = DB::transaction(function () use ($payment, $invoice, $reason) {
+            if ($existing = CreditNote::where('payment_id', $payment->id)->lockForUpdate()->first()) {
+                return $existing;
+            }
+            $gross = (string) ($payment->paid_amount ?? $payment->amount);
+            $split = $this->splitGross($gross, (string) $invoice->gst_rate, (float) $invoice->igst > 0);
+            $now = now();
+            $fy = self::financialYear($now);
+            $seq = $this->nextNumber($invoice->supplier_gstin, $fy, 'DBN');
+            $data = [
+                'note_type' => 'debit', 'company_id' => $invoice->company_id, 'invoice_id' => $invoice->id, 'payment_id' => $payment->id,
+                'booking_id' => $invoice->booking_id, 'number' => $this->format($invoice->company->invoice_prefix, $fy, $seq, 'DBN'), 'sequence' => $seq,
+                'financial_year' => $fy, 'issued_at' => $now, 'supplier_gstin' => $invoice->supplier_gstin, 'recipient_gstin' => $invoice->recipient_gstin,
+                'place_of_supply' => $invoice->place_of_supply, 'reason' => mb_substr($reason, 0, 255),
+                'taxable_amount' => $split['taxable'], 'gst_rate' => (string) $invoice->gst_rate,
+                'cgst' => $split['cgst'], 'sgst' => $split['sgst'], 'igst' => $split['igst'], 'total_tax' => $split['tax'], 'total' => $gross,
+                'amount_in_words' => IndianNumber::rupeesInWords($gross),
+            ];
+            $data['content_hash'] = self::hash($data);
+            $note = CreditNote::create($data);
+            activity()->performedOn($invoice->booking)->withProperties(['debit_note' => $note->number, 'total' => $note->total])->log('debit note issued');
+
+            return $note;
+        });
         if ($note) {
             DB::afterCommit(fn () => $this->notify($note));
         }
@@ -224,8 +269,8 @@ class InvoiceService
         $p = substr(strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $prefix)) ?: 'INV', 0, 4);
         $years = substr($fy, 2, 2).substr($fy, 5, 2);
 
-        return $type === 'CRN'
-            ? substr($p, 0, 3).'C/'.$years.'/'.str_pad((string) $seq, 5, '0', STR_PAD_LEFT)
+        return in_array($type, ['CRN', 'DBN'], true)
+            ? substr($p, 0, 3).($type === 'CRN' ? 'C' : 'D').'/'.$years.'/'.str_pad((string) $seq, 5, '0', STR_PAD_LEFT)
             : $p.'/'.$years.'/'.str_pad((string) $seq, 6, '0', STR_PAD_LEFT);
     }
 

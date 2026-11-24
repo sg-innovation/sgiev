@@ -110,6 +110,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/sessions/{session:uuid}/stop', [\App\Http\Controllers\StaffConsoleController::class, 'stop'])->name('stop');
         Route::post('/connectors/{connector}/status', [\App\Http\Controllers\StaffConsoleController::class, 'connectorStatus'])->name('connector-status');
         Route::post('/walk-ins', [\App\Http\Controllers\StaffConsoleController::class, 'walkIn'])->name('walk-in');
+        Route::post('/sessions/{session:uuid}/reading', [\App\Http\Controllers\StaffConsoleController::class, 'reading'])->name('reading');
         Route::post('/bookings/{booking:code}/collect', [\App\Http\Controllers\StaffConsoleController::class, 'collect'])->name('collect');
         Route::post('/bookings/{booking:code}/payment-link', [\App\Http\Controllers\StaffConsoleController::class, 'paymentLink'])->name('payment-link');
     });
