@@ -396,6 +396,15 @@ export default function BookingCreate({ station, chargers, dates, durations, rul
                                 </div>
                             )}
                             <InputError message={errors.start} className="mt-3" />
+                            {grid && slots.some((s) => !s.available && s.reason === 'Booked') && (
+                                <p className="mt-4 rounded-2xl bg-muted p-3 text-sm text-muted-foreground">
+                                    No time that suits you?{' '}
+                                    <Link href={`/stations/${station.slug}/waitlist?date=${date}&duration=${data.duration}`} className="font-semibold text-electric hover:underline">
+                                        Join the waiting list
+                                    </Link>{' '}
+                                    and we’ll hold the next free slot for you.
+                                </p>
+                            )}
                         </Panel>
                     )}
 

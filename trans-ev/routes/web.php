@@ -78,6 +78,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/book/{station:slug}', [BookingController::class, 'create'])->name('bookings.create');
         Route::get('/book/{station:slug}/availability', [BookingController::class, 'availability'])->middleware('throttle:120,1')->name('bookings.availability');
         Route::post('/book/{station:slug}/estimate', [BookingController::class, 'estimate'])->middleware('throttle:120,1')->name('bookings.estimate');
+        Route::get('/stations/{station:slug}/waitlist', [\App\Http\Controllers\WaitlistController::class, 'create'])->name('waitlist.create');
+        Route::post('/stations/{station:slug}/waitlist', [\App\Http\Controllers\WaitlistController::class, 'store'])->middleware('throttle:10,1')->name('waitlist.store');
         Route::post('/book/{station:slug}', [BookingController::class, 'store'])->middleware('throttle:10,1')->name('bookings.store');
     });
 
@@ -124,6 +126,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/charge/{key}', [\App\Http\Controllers\CheckInController::class, 'charger'])->middleware('throttle:30,1')->name('charge.show');
     Route::post('/charge/{key}', [\App\Http\Controllers\CheckInController::class, 'chargerCheckIn'])->middleware('throttle:10,1')->name('charge.checkin');
     Route::get('/print/chargers/{charger}/qr', [\App\Http\Controllers\CheckInController::class, 'sticker'])->name('chargers.sticker');
+    Route::get('/account/waitlist', [\App\Http\Controllers\WaitlistController::class, 'index'])->name('waitlist.index');
+    Route::post('/account/waitlist/{entry:uuid}/leave', [\App\Http\Controllers\WaitlistController::class, 'leave'])->middleware('throttle:20,1')->name('waitlist.leave');
     Route::get('/account/support', [\App\Http\Controllers\SupportController::class, 'index'])->name('support.index');
     Route::post('/account/support', [\App\Http\Controllers\SupportController::class, 'store'])->middleware('throttle:5,10')->name('support.store');
     Route::get('/account/support/{ticket:uuid}', [\App\Http\Controllers\SupportController::class, 'show'])->name('support.show');

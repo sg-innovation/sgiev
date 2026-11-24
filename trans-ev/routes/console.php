@@ -44,3 +44,6 @@ Schedule::command('reconciliation:run')->dailyAt(preg_match('/^([01]\d|2[0-3]):[
 // C5: reminders before the slot and automatic no-shows after the grace period.
 Schedule::call(fn () => app(\App\Services\NoShowService::class)->sendReminders())->name('bookings:reminders')->everyMinute()->withoutOverlapping();
 Schedule::call(fn () => app(\App\Services\NoShowService::class)->sweep())->name('bookings:auto-no-show')->everyMinute()->withoutOverlapping();
+
+// C7: offer freed slots to the waiting list (and pass lapsed offers on).
+Schedule::call(fn () => app(\App\Services\WaitlistService::class)->match())->name('waitlist:match')->everyMinute()->withoutOverlapping();

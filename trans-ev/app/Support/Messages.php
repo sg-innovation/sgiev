@@ -37,6 +37,11 @@ final class Messages
             'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'number' => 'Debit note number', 'amount' => 'Debit note total'],
             'mail' => ['subject' => 'Debit note {{number}} · Trans EV booking {{booking_code}}', 'action_label' => 'View booking', 'body' => "# Hello {{name}},\n\nA debit note for booking {{booking_code}} is attached. It adds ₹{{amount}} to the original invoice for the extra energy delivered, which you have paid."],
         ],
+        'waitlist.offer' => [
+            'label' => 'Waiting list: a slot opened up (to customer)',
+            'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'station' => 'Station', 'address' => 'Station address', 'slot' => 'Date and time', 'charger' => 'Charger', 'minutes' => 'Minutes to pay', 'expires' => 'Offer ends at'],
+            'mail' => ['subject' => 'A slot opened up at {{station}} · pay within {{minutes}} minutes', 'action_label' => 'Pay and confirm', 'body' => "# Good news, {{name}}!\n\nA charging slot you were waiting for is free at **{{station}}**:\n\n**{{slot}}** (IST), charger {{charger}}\n\nWe are holding it for you until **{{expires}}**. Pay before then to confirm; after that it goes to the next person in line."],
+        ],
         'booking.rescheduled' => [
             'label' => 'Booking moved to a new time (to customer)',
             'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'station' => 'Station', 'address' => 'Station address', 'slot' => 'New date and time', 'old_slot' => 'Previous start', 'charger' => 'Charger', 'changed_by' => 'Who changed it', 'reason' => 'Reason'],

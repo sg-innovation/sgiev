@@ -4,11 +4,12 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { CalendarClock, Car, Globe, LayoutGrid, LifeBuoy, MapPinned, UserCog } from 'lucide-react';
+import { CalendarClock, Car, Globe, Hourglass, LayoutGrid, LifeBuoy, MapPinned, UserCog } from 'lucide-react';
 
 const mainNavItems: NavItem[] = [
     { title: 'My account', url: '/dashboard', icon: LayoutGrid },
     { title: 'My bookings', url: '/account/bookings', icon: CalendarClock },
+    { title: 'Waiting lists', url: '/account/waitlist', icon: Hourglass },
     { title: 'My vehicles', url: '/settings/vehicles', icon: Car },
     { title: 'Find & book', url: '/stations', icon: MapPinned },
     { title: 'Profile & security', url: '/settings/profile', icon: UserCog },

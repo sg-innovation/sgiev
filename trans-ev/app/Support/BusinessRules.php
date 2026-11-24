@@ -22,6 +22,10 @@ final class BusinessRules
         'booking.min_lead_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 10, 'min' => 0, 'max' => 240, 'label' => 'Minimum notice before a slot (minutes)', 'help' => null],
         'booking.no_show_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 10, 'min' => 0, 'max' => 60, 'label' => 'No-show after (minutes)', 'help' => 'A booking counts as a no-show if charging has not started this long after the slot start.'],
         'booking.max_slots' => ['group' => 'Booking', 'type' => 'int', 'default' => 3, 'min' => 1, 'max' => 12, 'label' => 'Longest booking (slots)', 'help' => 'Used when a station does not set its own allowed durations.'],
+        // Waiting list (C7)
+        'waitlist.enabled' => ['group' => 'Booking', 'type' => 'int', 'default' => 1, 'min' => 0, 'max' => 1, 'label' => 'Waiting list on (1 = yes, 0 = no)', 'help' => null],
+        'waitlist.claim_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 10, 'min' => 2, 'max' => 120, 'label' => 'Time to pay for an offered slot (minutes)', 'help' => 'If not paid in time, the slot passes to the next customer in line.'],
+        'waitlist.max_per_user' => ['group' => 'Booking', 'type' => 'int', 'default' => 3, 'min' => 1, 'max' => 20, 'label' => 'Waiting lists a customer can be on at once', 'help' => null],
         // Reschedule (C6)
         'reschedule.max_per_booking' => ['group' => 'Booking', 'type' => 'int', 'default' => 2, 'min' => 0, 'max' => 10, 'label' => 'Times a customer can change a booking', 'help' => '0 = customers cannot reschedule (operators still can).'],
         'reschedule.min_notice_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 60, 'min' => 0, 'max' => 2880, 'label' => 'Customers can change a booking up to (minutes before the start)', 'help' => null],
