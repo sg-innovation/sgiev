@@ -45,6 +45,41 @@ class ViewBooking extends ViewRecord
                         ? Notification::make()->success()->title('Refund started')->send()
                         : Notification::make()->danger()->title('Refund failed again')->body('Check the payment gateway status.')->send();
                 }),
+            Action::make('reschedule')->label('Move booking')->icon('heroicon-m-calendar-days')->color('gray')
+                ->visible(fn (Booking $record) => $record->status->value === 'confirmed' && $record->start_at->isFuture() && auth()->user()->can('reschedule', $record))
+                ->modalDescription('Move to another time or charger at this station (same length). The customer is emailed the new time; the price stays the same.')
+                ->schema([
+                    \Filament\Forms\Components\Select::make('date')->label('Date')->required()->live()
+                        ->options(fn () => collect(app(\App\Services\AvailabilityService::class)->bookableDates())->mapWithKeys(fn ($d) => [$d => \Illuminate\Support\Carbon::parse($d, \App\Models\Station::TIMEZONE)->format('D, j M')])->all())
+                        ->default(fn (Booking $record) => $record->start_at->timezone(\App\Models\Station::TIMEZONE)->toDateString())
+                        ->afterStateUpdated(fn ($set) => $set('slot', null)),
+                    \Filament\Forms\Components\Select::make('slot')->label('Charger and start time')->required()->searchable()
+                        ->options(function (Booking $record, $get) {
+                            if (! $get('date')) {
+                                return [];
+                            }
+                            $out = [];
+                            foreach (app(\App\Services\RescheduleService::class)->options($record->loadMissing('station'), $get('date')) as $o) {
+                                foreach ($o['slots'] as $s) {
+                                    if (! $s['current']) {
+                                        $out[$o['label']][$o['connectorId'].'|'.$s['start']] = $s['label'];
+                                    }
+                                }
+                            }
+
+                            return $out;
+                        }),
+                    \Filament\Forms\Components\TextInput::make('reason')->label('Reason (shown to the customer)')->required()->maxLength(255)->placeholder('Charger under repair'),
+                ])
+                ->action(function (Booking $record, array $data) {
+                    [$connectorId, $start] = explode('|', $data['slot'], 2);
+                    try {
+                        $b = app(\App\Services\RescheduleService::class)->reschedule($record, \App\Models\Connector::query()->findOrFail($connectorId), \Illuminate\Support\Carbon::parse($start), auth()->user(), true, $data['reason']);
+                        Notification::make()->success()->title('Booking moved to '.$b->start_at->timezone(\App\Models\Station::TIMEZONE)->format('D, j M, g:i A'))->send();
+                    } catch (\Illuminate\Validation\ValidationException $e) {
+                        Notification::make()->danger()->title(collect($e->errors())->flatten()->first())->send();
+                    }
+                }),
             Action::make('noShow')->label('Mark no-show')->icon('heroicon-m-user-minus')->color('warning')
                 ->visible(fn (Booking $record) => auth()->user()->can('staffCancel', $record) && $record->status->value === 'confirmed'
                     && now()->gte($record->start_at->copy()->addMinutes(\App\Support\BusinessRules::int('booking.no_show_minutes'))))

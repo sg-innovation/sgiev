@@ -44,7 +44,7 @@ class AvailabilityService
      *
      * @return array<int, array{charger_id:int, connector_id:int, slots: list<array{start:string, end:string, label:string, available:bool, reason:?string}>}>
      */
-    public function grid(Station $station, string $localDate, int $durationMinutes): array
+    public function grid(Station $station, string $localDate, int $durationMinutes, ?int $ignoreBookingId = null): array
     {
         $station->loadMissing(['chargers.connectorPoints', 'operatingHours', 'holidayOverrides']);
         $date = Carbon::parse($localDate, Station::TIMEZONE)->startOfDay();
@@ -61,6 +61,7 @@ class AvailabilityService
 
         $bookings = Booking::query()
             ->whereIn('connector_id', $connectors->pluck('id'))
+            ->when($ignoreBookingId, fn ($q) => $q->whereKeyNot($ignoreBookingId))
             ->occupying()
             ->overlapping($dayStart, $dayEnd)
             ->get(['connector_id', 'start_at', 'blocked_until'])

@@ -2,6 +2,7 @@ import { directionsUrl, inr } from '@/components/site/station-bits';
 import CancellationPolicyCard, { type PolicyView } from '@/components/site/cancellation-policy';
 import CheckInPass from '@/components/site/check-in-pass';
 import RunningLate from '@/components/site/running-late';
+import Reschedule, { type RescheduleInfo } from '@/components/site/reschedule';
 import SiteLayout from '@/layouts/site-layout';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
@@ -45,6 +46,8 @@ interface BookingDetail {
     cancelledAt: string | null;
     cancelReason: string | null;
     createdAt: string;
+    reschedule: RescheduleInfo | null;
+    history: { at: string; by: string; from: string; to: string; reason: string | null }[];
     late: { canNotify: boolean; holdUntil: string; eta: string | null; maxExtra: number } | null;
     noShow: { at: string; grace: number; percent: number; refund: number; retained: number; auto: boolean } | null;
     finalBill: { kwh: number; total: number; prepaid: number; difference: number; status: string; balanceDue: number | null; outcome: string | null } | null;
@@ -214,6 +217,20 @@ export default function BookingShow({ booking: b }: { booking: BookingDetail }) 
                     </div>
                 )}
                 {(b.status === 'confirmed' || b.status === 'checked_in') && <CheckInPass code={b.code} chargerCode={b.charger.code} />}
+                {b.reschedule && <Reschedule code={b.code} info={b.reschedule} />}
+                {b.history.length > 0 && (
+                    <div className="rounded-2xl bg-muted p-4 text-sm text-foreground">
+                        <p className="font-semibold">Changes to this booking</p>
+                        <ul className="mt-2 space-y-1 text-muted-foreground">
+                            {b.history.map((h, i) => (
+                                <li key={i}>
+                                    {h.at} · {h.by} moved it from {h.from} to <span className="font-medium text-foreground">{h.to}</span>
+                                    {h.reason && <> · “{h.reason}”</>}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
 
                 <div className="grid gap-6 md:grid-cols-[1fr_340px]">
                     <div className="space-y-6">

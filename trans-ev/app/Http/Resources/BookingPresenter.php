@@ -115,6 +115,21 @@ final class BookingPresenter
                 'at' => $r->marked_at->timezone(Station::TIMEZONE)->format('j M, g:i A'), 'grace' => $r->grace_minutes, 'percent' => $r->refund_percent,
                 'refund' => (float) $r->refund_amount, 'retained' => (float) $r->retained_amount, 'auto' => $r->method === 'auto',
             ] : null,
+            'reschedule' => $b->status->value === 'confirmed' && auth()->id() === $b->user_id ? (function () use ($b) {
+                $svc = app(\App\Services\RescheduleService::class);
+                $max = \App\Support\BusinessRules::int('reschedule.max_per_booking');
+
+                return [
+                    'blocker' => $svc->customerBlocker($b, auth()->user()), 'remaining' => max(0, $max - $svc->customerChanges($b)),
+                    'noticeMinutes' => \App\Support\BusinessRules::int('reschedule.min_notice_minutes'),
+                    'dates' => collect(app(\App\Services\AvailabilityService::class)->bookableDates())->map(fn ($d) => ['value' => $d, 'label' => \Illuminate\Support\Carbon::parse($d, Station::TIMEZONE)->format('D j M')])->values(),
+                ];
+            })() : null,
+            'history' => \App\Models\BookingReschedule::query()->where('booking_id', $b->id)->with(['fromCharger', 'toCharger'])->orderBy('id')->get()->map(fn ($r) => [
+                'at' => $r->created_at->timezone(Station::TIMEZONE)->format('j M, g:i A'), 'by' => $r->by_role === 'operator' ? 'Station' : 'You',
+                'from' => $r->from_start->timezone(Station::TIMEZONE)->format('D j M, g:i A').' · '.$r->fromCharger?->code,
+                'to' => $r->to_start->timezone(Station::TIMEZONE)->format('D j M, g:i A').' · '.$r->toCharger?->code, 'reason' => $r->reason,
+            ])->values(),
             'canCancel' => $b->canBeCancelledByCustomer(),
             'canPay' => $b->isHoldActive(),
             'cancellationPolicy' => self::policy(\App\Services\Payments\RefundService::policyOf($b)),

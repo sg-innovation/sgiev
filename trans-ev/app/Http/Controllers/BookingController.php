@@ -240,6 +240,25 @@ class BookingController extends Controller
         return Inertia::render('booking/show', ['booking' => BookingPresenter::detail($booking)]);
     }
 
+    /** C6: free slots for moving this booking on a day. */
+    public function rescheduleOptions(Request $request, Booking $booking): JsonResponse
+    {
+        abort_unless($booking->user_id === $request->user()->id, 403);
+        $date = $request->validate(['date' => ['required', 'date_format:Y-m-d', Rule::in($this->availability->bookableDates())]])['date'];
+        $svc = app(\App\Services\RescheduleService::class);
+
+        return response()->json(['blocker' => $svc->customerBlocker($booking, $request->user()), 'connectors' => $svc->options($booking->load('station'), $date)]);
+    }
+
+    public function reschedule(Request $request, Booking $booking): RedirectResponse
+    {
+        $d = $request->validate(['connector_id' => ['required', 'integer'], 'start' => ['required', 'date']]);
+        $connector = \App\Models\Connector::query()->findOrFail($d['connector_id']);
+        $b = app(\App\Services\RescheduleService::class)->reschedule($booking, $connector, \Illuminate\Support\Carbon::parse($d['start']), $request->user(), false);
+
+        return to_route('bookings.show', $b)->with('success', 'Booking moved to '.$b->start_at->timezone(\App\Models\Station::TIMEZONE)->format('D, j M, g:i A').' on charger '.$b->charger->code.'.');
+    }
+
     /** C5: the customer tells the station they are running late. */
     public function runningLate(Request $request, Booking $booking): RedirectResponse
     {

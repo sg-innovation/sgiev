@@ -22,6 +22,9 @@ final class BusinessRules
         'booking.min_lead_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 10, 'min' => 0, 'max' => 240, 'label' => 'Minimum notice before a slot (minutes)', 'help' => null],
         'booking.no_show_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 10, 'min' => 0, 'max' => 60, 'label' => 'No-show after (minutes)', 'help' => 'A booking counts as a no-show if charging has not started this long after the slot start.'],
         'booking.max_slots' => ['group' => 'Booking', 'type' => 'int', 'default' => 3, 'min' => 1, 'max' => 12, 'label' => 'Longest booking (slots)', 'help' => 'Used when a station does not set its own allowed durations.'],
+        // Reschedule (C6)
+        'reschedule.max_per_booking' => ['group' => 'Booking', 'type' => 'int', 'default' => 2, 'min' => 0, 'max' => 10, 'label' => 'Times a customer can change a booking', 'help' => '0 = customers cannot reschedule (operators still can).'],
+        'reschedule.min_notice_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 60, 'min' => 0, 'max' => 2880, 'label' => 'Customers can change a booking up to (minutes before the start)', 'help' => null],
         // Reminders and no-shows (C5)
         'reminders.before_minutes' => ['group' => 'Booking', 'type' => 'string', 'default' => '60,15,0', 'label' => 'Send reminders this many minutes before the slot (comma-separated; 0 = at the start time)', 'help' => 'Leave empty to send no reminders.'],
         'booking.auto_no_show' => ['group' => 'Booking', 'type' => 'int', 'default' => 1, 'min' => 0, 'max' => 1, 'label' => 'Mark no-shows automatically (1 = yes, 0 = staff mark them)', 'help' => 'Refunds follow the no-show policy agreed at checkout.'],

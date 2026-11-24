@@ -37,6 +37,11 @@ final class Messages
             'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'number' => 'Debit note number', 'amount' => 'Debit note total'],
             'mail' => ['subject' => 'Debit note {{number}} · Trans EV booking {{booking_code}}', 'action_label' => 'View booking', 'body' => "# Hello {{name}},\n\nA debit note for booking {{booking_code}} is attached. It adds ₹{{amount}} to the original invoice for the extra energy delivered, which you have paid."],
         ],
+        'booking.rescheduled' => [
+            'label' => 'Booking moved to a new time (to customer)',
+            'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'station' => 'Station', 'address' => 'Station address', 'slot' => 'New date and time', 'old_slot' => 'Previous start', 'charger' => 'Charger', 'changed_by' => 'Who changed it', 'reason' => 'Reason'],
+            'mail' => ['subject' => 'New time for your charging booking · {{booking_code}}', 'action_label' => 'View booking', 'body' => "# Hello {{name}},\n\nYour booking at **{{station}}** was moved by {{changed_by}}.\n\n**New time:** {{slot}} (IST), charger {{charger}}\n\nPreviously: {{old_slot}}\n\n{{reason}}\n\nYour payment and receipt stay the same."],
+        ],
         'booking.reminder' => [
             'label' => 'Booking reminder before the slot (to customer)',
             'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'station' => 'Station', 'address' => 'Station address', 'slot' => 'Date and time', 'start_time' => 'Start time', 'charger' => 'Charger', 'minutes' => 'Minutes to the slot', 'no_show_minutes' => 'Grace minutes'],

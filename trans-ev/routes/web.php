@@ -83,6 +83,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/account/bookings', [BookingController::class, 'index'])->name('bookings.index');
     Route::get('/account/bookings/{booking:code}', [BookingController::class, 'show'])->name('bookings.show');
+    Route::get('/account/bookings/{booking:code}/reschedule', [BookingController::class, 'rescheduleOptions'])->middleware('throttle:60,1')->name('bookings.reschedule-options');
+    Route::post('/account/bookings/{booking:code}/reschedule', [BookingController::class, 'reschedule'])->middleware('throttle:10,1')->name('bookings.reschedule');
     Route::post('/account/bookings/{booking:code}/running-late', [BookingController::class, 'runningLate'])->middleware('throttle:10,1')->name('bookings.running-late');
     Route::post('/account/bookings/{booking:code}/cancel', [BookingController::class, 'cancel'])->middleware('throttle:10,1')->name('bookings.cancel');
     Route::post('/account/bookings/{booking:code}/pay', [PaymentController::class, 'start'])->middleware(['verified', 'throttle:10,1'])->name('bookings.pay');
