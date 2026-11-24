@@ -1,5 +1,6 @@
 import { directionsUrl, inr } from '@/components/site/station-bits';
 import CancellationPolicyCard, { type PolicyView } from '@/components/site/cancellation-policy';
+import CheckInPass from '@/components/site/check-in-pass';
 import SiteLayout from '@/layouts/site-layout';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
@@ -197,6 +198,8 @@ export default function BookingShow({ booking: b }: { booking: BookingDetail }) 
                         <XCircle className="size-5 shrink-0 text-red-500" /> Cancelled on {b.cancelledAt}. {b.cancelReason}
                     </div>
                 )}
+
+                {(b.status === 'confirmed' || b.status === 'checked_in') && <CheckInPass code={b.code} chargerCode={b.charger.code} />}
 
                 <div className="grid gap-6 md:grid-cols-[1fr_340px]">
                     <div className="space-y-6">

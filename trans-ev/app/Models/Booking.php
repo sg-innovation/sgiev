@@ -29,6 +29,7 @@ class Booking extends Model
             'blocked_until' => 'datetime',
             'hold_expires_at' => 'datetime',
             'confirmed_at' => 'datetime',
+            'checked_in_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'customer_snapshot' => 'array',
             'vehicle_snapshot' => 'array',
@@ -92,6 +93,11 @@ class Booking extends Model
     public function charger(): BelongsTo
     {
         return $this->belongsTo(Charger::class)->withTrashed();
+    }
+
+    public function checkIn(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(CheckInRecord::class);
     }
 
     public function connectorPoint(): BelongsTo

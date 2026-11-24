@@ -74,6 +74,9 @@ class ApprovalService
         if ($station->chargers()->doesntExist() || $station->tariffs()->doesntExist()) {
             throw ValidationException::withMessages(['station' => 'Add at least one charger and a tariff before submitting.']);
         }
+        if (! app(\App\Services\GstService::class)->invoiceGstin($station->loadMissing('company'))) {
+            throw ValidationException::withMessages(['station' => 'Add the GSTIN registered in this station’s state (Station → Legal & contact) so customers can be given GST invoices.']);
+        }
         $station->forceFill(['approval_status' => $station->approval_status === 'approved' ? 'approved' : 'submitted', 'submitted_at' => now()])->save();
         activity()->performedOn($station)->causedBy($by)->log('station submitted for approval');
     }
@@ -82,6 +85,9 @@ class ApprovalService
     {
         if ($station->company?->status !== 'active') {
             throw ValidationException::withMessages(['station' => 'Approve the company first.']);
+        }
+        if (! app(\App\Services\GstService::class)->invoiceGstin($station->loadMissing('company'))) {
+            throw ValidationException::withMessages(['station' => 'Add the GSTIN registered in this station’s state (Station → Legal & contact) so customers can be given GST invoices.']);
         }
         $station->forceFill(['approval_status' => 'approved', 'approval_note' => null, 'needs_review' => false, 'approved_at' => now(), 'approved_by' => $by->id])->save();
         activity()->performedOn($station)->causedBy($by)->log('station approved');

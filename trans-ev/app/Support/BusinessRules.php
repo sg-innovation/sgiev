@@ -22,6 +22,9 @@ final class BusinessRules
         'booking.min_lead_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 10, 'min' => 0, 'max' => 240, 'label' => 'Minimum notice before a slot (minutes)', 'help' => null],
         'booking.no_show_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 10, 'min' => 0, 'max' => 60, 'label' => 'No-show after (minutes)', 'help' => 'A booking counts as a no-show if charging has not started this long after the slot start.'],
         'booking.max_slots' => ['group' => 'Booking', 'type' => 'int', 'default' => 3, 'min' => 1, 'max' => 12, 'label' => 'Longest booking (slots)', 'help' => 'Used when a station does not set its own allowed durations.'],
+        // Check-in (C1)
+        'checkin.early_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 15, 'min' => 0, 'max' => 120, 'label' => 'Check-in opens before the slot (minutes)', 'help' => 'Customers can be checked in this long before their slot starts, if the charger is free.'],
+        'checkin.qr_minutes' => ['group' => 'Booking', 'type' => 'int', 'default' => 5, 'min' => 1, 'max' => 60, 'label' => 'Check-in QR valid for (minutes)', 'help' => 'The QR on the customer’s booking refreshes automatically; screenshots stop working after this.'],
         // Pricing estimate
         'pricing.charging_efficiency' => ['group' => 'Pricing estimate', 'type' => 'decimal', 'default' => '0.90', 'min' => 0.5, 'max' => 1, 'label' => 'Charging efficiency', 'help' => 'Share of energy drawn from the charger that reaches the battery.'],
         'pricing.power_utilisation' => ['group' => 'Pricing estimate', 'type' => 'decimal', 'default' => '0.85', 'min' => 0.3, 'max' => 1, 'label' => 'Average power utilisation', 'help' => 'Average share of rated power a vehicle draws (charging slows near full).'],

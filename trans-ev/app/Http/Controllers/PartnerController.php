@@ -53,7 +53,7 @@ class PartnerController extends Controller
         $data = $request->validate([
             'legal_name' => ['required', 'string', 'max:200', $noTags],
             'trade_name' => ['required', 'string', 'max:120', $noTags],
-            'gstin' => ['nullable', 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/', 'unique:companies,gstin'],
+            'gstin' => ['nullable', 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/', new \App\Rules\ValidGstin, 'unique:companies,gstin'],
             'pan' => ['required', 'regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/'],
             'address_line1' => ['required', 'string', 'max:200', $noTags],
             'city' => ['required', 'string', 'max:80', $noTags],

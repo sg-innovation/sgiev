@@ -41,6 +41,12 @@ class BookingPolicy
         return $user->can('bookings.manage') && $this->inScope($user, $booking);
     }
 
+    /** Staff check a customer in at the station (scan, desk or manual). */
+    public function checkIn(User $user, Booking $booking): bool
+    {
+        return $user->can('bookings.manage') && $this->inScope($user, $booking);
+    }
+
     public function create(User $user): bool
     {
         return false; // created only through the booking wizard

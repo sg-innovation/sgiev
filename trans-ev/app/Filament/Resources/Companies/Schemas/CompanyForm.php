@@ -45,7 +45,7 @@ class CompanyForm
                 TextInput::make('trade_name')->label('Brand / trade name')->required()->maxLength(255)->notRegex('/[<>]/')->validationMessages(['not_regex' => 'The characters < and > are not allowed.'])
                     ->helperText('Shown to customers as “Operated by …”.'),
                 TextInput::make('gstin')->label('GSTIN')->maxLength(15)
-                    ->regex('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/')->dehydrateStateUsing($upper),
+                    ->regex('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/')->rule(new \App\Rules\ValidGstin)->dehydrateStateUsing($upper),
                 TextInput::make('pan')->label('PAN')->maxLength(10)->regex('/^[A-Z]{5}[0-9]{4}[A-Z]$/')->dehydrateStateUsing($upper),
                 TextInput::make('cin')->label('CIN')->maxLength(21)->dehydrateStateUsing($upper),
                 TextInput::make('invoice_prefix')->required()->maxLength(8)->alphaNum()->default('INV')

@@ -24,7 +24,7 @@ class DemoCompanySeeder extends Seeder
         $company = Company::query()->updateOrCreate(['slug' => 'greengrid-demo'], [
             'legal_name' => 'GreenGrid Charging Private Limited (DEMO)',
             'trade_name' => 'GreenGrid',
-            'gstin' => '27AAAAA0000A1Z5',
+            'gstin' => '27AAAAA0000A1Z2',
             'pan' => 'AAAAA0000A',
             'address_line1' => 'Demo Tower, Baner Road',
             'city' => 'Pune',

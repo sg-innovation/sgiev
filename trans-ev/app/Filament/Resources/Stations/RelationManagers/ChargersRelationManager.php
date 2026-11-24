@@ -106,6 +106,8 @@ class ChargersRelationManager extends RelationManager
                 CreateAction::make()->mutateDataUsing(fn (array $data) => $data + ['connectors' => []]),
             ])
             ->recordActions([
+                \Filament\Actions\Action::make('qr')->label('QR sticker')->icon('heroicon-m-qr-code')->color('gray')
+                    ->url(fn ($record) => route('chargers.sticker', $record), shouldOpenInNewTab: true),
                 ChangeStatusAction::make(),
                 EditAction::make(),
                 DeleteAction::make()->label('Archive'),

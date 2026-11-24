@@ -39,7 +39,7 @@ class PartnerOnboardingTest extends TestCase
     {
         return array_merge([
             'legal_name' => 'Volt Ways Private Limited', 'trade_name' => 'VoltWays',
-            'gstin' => '27ABCDE1234F1Z5', 'pan' => 'abcde1234f',
+            'gstin' => '27ABCDE1234F1Z0', 'pan' => 'abcde1234f',
             'address_line1' => '12 MG Road', 'city' => 'Pune', 'state_code' => '27', 'pincode' => '411001',
             'name' => 'Asha Rao', 'email' => 'asha@voltways.test', 'phone' => '98765 43210',
             'password' => 'Very-Strong-Pass-2026!', 'password_confirmation' => 'Very-Strong-Pass-2026!',
@@ -71,7 +71,7 @@ class PartnerOnboardingTest extends TestCase
     {
         $this->post('/partner', $this->payload())->assertRedirect(route('partner.thanks'));
 
-        $company = Company::where('gstin', '27ABCDE1234F1Z5')->firstOrFail();
+        $company = Company::where('gstin', '27ABCDE1234F1Z0')->firstOrFail();
         $this->assertSame('pending', $company->status);
         $this->assertSame('Maharashtra', $company->state);
         $this->assertSame('ABCDE1234F', $company->pan);

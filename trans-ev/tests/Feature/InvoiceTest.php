@@ -92,10 +92,10 @@ class InvoiceTest extends TestCase
         $this->assertStringEndsWith(' Only', $inv->amount_in_words);
         Notification::assertSentTo($this->customer, GstDocumentIssued::class);
 
-        $second = $this->paidBooking('2026-11-25 14:00', '10ABCDE1234F1Z5');
+        $second = $this->paidBooking('2026-11-25 14:00', '10ABCDE1234F1ZF');
         $this->assertSame('TEV/2627/000002', $second->invoice->number, 'gapless, consecutive');
         $this->assertSame('B2B', $second->invoice->supply_type);
-        $this->assertSame('10ABCDE1234F1Z5', $second->invoice->recipient_gstin);
+        $this->assertSame('10ABCDE1234F1ZF', $second->invoice->recipient_gstin);
     }
 
     public function test_issuing_is_idempotent(): void
@@ -190,7 +190,7 @@ class InvoiceTest extends TestCase
     public function test_gstr1_export_files(): void
     {
         $this->paidBooking();
-        $this->paidBooking('2026-11-25 14:00', '10ABCDE1234F1Z5');
+        $this->paidBooking('2026-11-25 14:00', '10ABCDE1234F1ZF');
         $path = app(Gstr1Export::class)->build('10AANCT1689C1ZG', Carbon::parse('2026-11-01', 'Asia/Kolkata'), sys_get_temp_dir());
 
         $zip = new ZipArchive;
@@ -198,7 +198,7 @@ class InvoiceTest extends TestCase
         foreach (['b2b.csv', 'b2cs.csv', 'cdnr.csv', 'hsn.csv', 'docs.csv'] as $f) {
             $this->assertNotFalse($zip->locateName($f), $f);
         }
-        $this->assertStringContainsString('10ABCDE1234F1Z5', $zip->getFromName('b2b.csv'));
+        $this->assertStringContainsString('10ABCDE1234F1ZF', $zip->getFromName('b2b.csv'));
         $this->assertStringContainsString('10-Bihar', $zip->getFromName('b2cs.csv'));
         $this->assertStringContainsString('TEV/2627/000001', $zip->getFromName('docs.csv'));
         $zip->close();

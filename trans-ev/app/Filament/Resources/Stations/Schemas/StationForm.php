@@ -133,10 +133,14 @@ class StationForm
                 Tab::make('Legal & contact')->icon('heroicon-m-building-office')->schema([
                     Grid::make(3)->disabled($locked)->schema([
                         TextInput::make('gstin')->label('GSTIN for this state')->maxLength(15)
-                            ->regex('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/')
+                            ->regex('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/')->rule(new \App\Rules\ValidGstin)
                             ->rule(fn (Get $get) => function (string $attribute, $value, \Closure $fail) use ($get) {
                                 if (filled($value) && substr(strtoupper($value), 0, 2) !== $get('state_code')) {
                                     $fail('The GSTIN must be registered in the station’s state (it must start with '.$get('state_code').').');
+                                }
+                                $pan = \App\Models\Company::query()->whereKey($get('company_id') ?: \App\Support\Tenancy::companyId())->value('pan');
+                                if (filled($value) && $pan && \App\Support\Gstin::pan($value) !== strtoupper($pan)) {
+                                    $fail('A state GSTIN must belong to the same company: characters 3–12 must be its PAN ('.strtoupper($pan).').');
                                 }
                             })
                             ->helperText('Required unless the company GSTIN is registered in this state. Invoices use this GSTIN.')

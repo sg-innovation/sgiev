@@ -90,6 +90,13 @@ Route::middleware(['auth'])->group(function () {
             'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, no-store',
         ]);
     })->middleware('throttle:30,1')->name('platform-fees.pdf');
+    // C1 check-in
+    Route::get('/account/bookings/{booking:code}/pass', [\App\Http\Controllers\CheckInController::class, 'pass'])->middleware('throttle:30,1')->name('bookings.pass');
+    Route::get('/checkin/{token}', [\App\Http\Controllers\CheckInController::class, 'show'])->middleware('throttle:60,1')->name('checkin.show');
+    Route::post('/checkin/{token}', [\App\Http\Controllers\CheckInController::class, 'store'])->middleware('throttle:30,1')->name('checkin.store');
+    Route::get('/charge/{key}', [\App\Http\Controllers\CheckInController::class, 'charger'])->middleware('throttle:30,1')->name('charge.show');
+    Route::post('/charge/{key}', [\App\Http\Controllers\CheckInController::class, 'chargerCheckIn'])->middleware('throttle:10,1')->name('charge.checkin');
+    Route::get('/print/chargers/{charger}/qr', [\App\Http\Controllers\CheckInController::class, 'sticker'])->name('chargers.sticker');
     Route::get('/account/support', [\App\Http\Controllers\SupportController::class, 'index'])->name('support.index');
     Route::post('/account/support', [\App\Http\Controllers\SupportController::class, 'store'])->middleware('throttle:5,10')->name('support.store');
     Route::get('/account/support/{ticket:uuid}', [\App\Http\Controllers\SupportController::class, 'show'])->name('support.show');

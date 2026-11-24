@@ -20,6 +20,20 @@ class ViewBooking extends ViewRecord
             Action::make('receipt')->label('View / download receipt')->icon('heroicon-m-document-text')->color('gray')
                 ->visible(fn (Booking $record) => $record->payments()->where('status', 'success')->exists())
                 ->url(fn (Booking $record) => route('bookings.receipt', $record), shouldOpenInNewTab: true),
+            Action::make('checkIn')->label('Check in')->icon('heroicon-m-qr-code')->color('success')
+                ->visible(fn (Booking $record) => auth()->user()->can('checkIn', $record) && $record->status->value === 'confirmed')
+                ->requiresConfirmation()
+                ->modalDescription(fn (Booking $record) => 'Confirm the vehicle '.($record->vehicle_snapshot['registration_no'] ?? '').' is at charger '.$record->charger?->code.'.'
+                    .(($b = app(\App\Services\CheckInService::class)->blocker($record)) ? ' '.$b : ''))
+                ->schema([\Filament\Forms\Components\TextInput::make('note')->label('Note (optional)')->maxLength(255)])
+                ->action(function (Booking $record, array $data) {
+                    try {
+                        app(\App\Services\CheckInService::class)->checkIn($record, 'manual', auth()->user(), null, $data['note'] ?? null);
+                        Notification::make()->success()->title('Checked in')->send();
+                    } catch (\Illuminate\Validation\ValidationException $e) {
+                        Notification::make()->danger()->title(collect($e->errors())->flatten()->first())->send();
+                    }
+                }),
             Action::make('noShow')->label('Mark no-show')->icon('heroicon-m-user-minus')->color('warning')
                 ->visible(fn (Booking $record) => auth()->user()->can('staffCancel', $record) && $record->status->value === 'confirmed'
                     && now()->gte($record->start_at->copy()->addMinutes(\App\Support\BusinessRules::int('booking.no_show_minutes'))))

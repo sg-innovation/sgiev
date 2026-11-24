@@ -17,6 +17,8 @@ class Charger extends Model
     use LogsActivity, SoftDeletes;
 
     // status / status_reason change only through StationStatusService.
+    protected $hidden = ['qr_key'];
+
     protected $fillable = ['station_id', 'code', 'name', 'oem', 'model', 'serial_no', 'ocpp_identity', 'ocpp_protocol', 'type', 'power_kw', 'connectors',
         'input_voltage_v', 'phases', 'output_voltage_min_v', 'output_voltage_max_v', 'max_current_a', 'standard',
         'meter_serial', 'meter_accuracy_class', 'firmware_version', 'commissioned_on'];
@@ -53,6 +55,7 @@ class Charger extends Model
 
     protected static function booted(): void
     {
+        static::creating(fn (Charger $c) => $c->qr_key ??= \Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(24)));
         // Chargers created with a list of connector types (seeders, imports) get one connector row per type.
         static::created(function (Charger $charger) {
             if ($charger->connectorPoints()->withTrashed()->doesntExist()) {
