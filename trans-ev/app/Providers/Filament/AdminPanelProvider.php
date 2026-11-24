@@ -54,6 +54,11 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Dashboard::class,
             ])
+            ->navigationItems([
+                \Filament\Navigation\NavigationItem::make('Staff console')->group('Bookings & Payments')->sort(1)
+                    ->icon('heroicon-o-device-phone-mobile')->url(fn () => route('staff.console'), shouldOpenInNewTab: true)
+                    ->visible(fn () => \App\Http\Controllers\StaffConsoleController::canUse(auth()->user())),
+            ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([])
             ->middleware([

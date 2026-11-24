@@ -90,6 +90,16 @@ Route::middleware(['auth'])->group(function () {
             'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, no-store',
         ]);
     })->middleware('throttle:30,1')->name('platform-fees.pdf');
+    // C2 staff console
+    Route::prefix('staff')->name('staff.')->middleware('throttle:120,1')->group(function () {
+        Route::get('/', [\App\Http\Controllers\StaffConsoleController::class, 'index'])->name('console');
+        Route::post('/scan', [\App\Http\Controllers\StaffConsoleController::class, 'scan'])->name('scan');
+        Route::post('/bookings/{booking:code}/check-in', [\App\Http\Controllers\StaffConsoleController::class, 'checkIn'])->name('check-in');
+        Route::post('/bookings/{booking:code}/start', [\App\Http\Controllers\StaffConsoleController::class, 'start'])->name('start');
+        Route::post('/bookings/{booking:code}/no-show', [\App\Http\Controllers\StaffConsoleController::class, 'noShow'])->name('no-show');
+        Route::post('/sessions/{session:uuid}/stop', [\App\Http\Controllers\StaffConsoleController::class, 'stop'])->name('stop');
+        Route::post('/connectors/{connector}/status', [\App\Http\Controllers\StaffConsoleController::class, 'connectorStatus'])->name('connector-status');
+    });
     // C1 check-in
     Route::get('/account/bookings/{booking:code}/pass', [\App\Http\Controllers\CheckInController::class, 'pass'])->middleware('throttle:30,1')->name('bookings.pass');
     Route::get('/checkin/{token}', [\App\Http\Controllers\CheckInController::class, 'show'])->middleware('throttle:60,1')->name('checkin.show');
