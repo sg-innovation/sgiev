@@ -11,7 +11,7 @@ interface Arrival {
     code: string; status: string; statusLabel: string; start: string; end: string; startIso: string; endIso: string;
     customer: string | null; phone: string | null; vehicle: string; registration: string | null; charger: string | null; connector: string | null;
     batteryFrom: number; batteryTo: number; estKwh: number; checkedInAt: string | null; blocker: string | null; canNoShow: boolean; session: Session | null;
-    source: string; settlement: string | null; lateEta: string | null; lateNote: string | null; noShowAt: string | null;
+    source: string; settlement: string | null; lateEta: string | null; lateNote: string | null; stopRequestedAt: string | null; noShowAt: string | null;
     bill: { kind: 'walk_in' | 'final'; total: number; due: number; prepaid: number | null; outcome: string | null; taxable: number | null; tax: number | null; lines: { label: string; qty: number; unit: string; amount: number }[]; paidBy: string | null; invoiceUrl: string | null } | null;
 }
 interface WalkInOptions {
@@ -280,6 +280,7 @@ function ArrivalCard({ a, can, onCheckIn, onStart, onStop, onNoShow, onCollect, 
                     <Chip tone={active ? 'warning' : (STATUS_TONE[a.status] ?? 'gray')}>{active ? 'Charging' : a.status === 'checked_in' ? 'Checked in' : a.statusLabel}</Chip>
                     {lateBy > 0 && a.status === 'confirmed' && <Chip tone="danger">Late {lateBy} min</Chip>}
                     {a.lateEta && <Chip tone="warning">On the way · ETA {a.lateEta}</Chip>}
+                    {a.stopRequestedAt && <Chip tone="danger">Customer asked to stop · {a.stopRequestedAt}</Chip>}
                 </div>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-3 text-sm">

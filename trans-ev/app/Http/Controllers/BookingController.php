@@ -240,6 +240,21 @@ class BookingController extends Controller
         return Inertia::render('booking/show', ['booking' => BookingPresenter::detail($booking)]);
     }
 
+    /** C9: live charging data for the customer's tracking card (polled). */
+    public function live(Request $request, Booking $booking): JsonResponse
+    {
+        abort_unless($booking->user_id === $request->user()->id, 403);
+
+        return response()->json(app(\App\Services\LiveSessionService::class)->forBooking($booking))->header('Cache-Control', 'no-store');
+    }
+
+    public function requestStop(Request $request, Booking $booking): RedirectResponse
+    {
+        app(\App\Services\LiveSessionService::class)->requestStop($booking, $request->user());
+
+        return to_route('bookings.show', $booking)->with('success', 'We’ve asked the station staff to stop charging. Please stay near your vehicle.');
+    }
+
     /** C6: free slots for moving this booking on a day. */
     public function rescheduleOptions(Request $request, Booking $booking): JsonResponse
     {

@@ -33,6 +33,7 @@ class Booking extends Model
             'reminders_sent' => 'array',
             'late_notice_at' => 'datetime',
             'late_eta_at' => 'datetime',
+            'stop_requested_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'customer_snapshot' => 'array',
             'vehicle_snapshot' => 'array',

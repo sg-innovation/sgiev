@@ -1,6 +1,7 @@
 import { directionsUrl, inr } from '@/components/site/station-bits';
 import CancellationPolicyCard, { type PolicyView } from '@/components/site/cancellation-policy';
 import CheckInPass from '@/components/site/check-in-pass';
+import LiveSession from '@/components/site/live-session';
 import RunningLate from '@/components/site/running-late';
 import Reschedule, { type RescheduleInfo } from '@/components/site/reschedule';
 import SiteLayout from '@/layouts/site-layout';
@@ -216,6 +217,7 @@ export default function BookingShow({ booking: b }: { booking: BookingDetail }) 
                         </p>
                     </div>
                 )}
+                {b.status === 'checked_in' && <LiveSession code={b.code} />}
                 {(b.status === 'confirmed' || b.status === 'checked_in') && <CheckInPass code={b.code} chargerCode={b.charger.code} />}
                 {b.reschedule && <Reschedule code={b.code} info={b.reschedule} />}
                 {b.history.length > 0 && (
