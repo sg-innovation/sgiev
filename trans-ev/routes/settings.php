@@ -21,6 +21,9 @@ Route::middleware('auth')->group(function () {
     Route::put('settings/vehicles/{vehicle}', [VehicleController::class, 'update'])->middleware('throttle:30,1')->name('vehicles.update');
     Route::delete('settings/vehicles/{vehicle}', [VehicleController::class, 'destroy'])->middleware('throttle:30,1')->name('vehicles.destroy');
 
+    Route::get('settings/notifications', [\App\Http\Controllers\Settings\NotificationPreferencesController::class, 'edit'])->name('notifications.edit');
+    Route::put('settings/notifications', [\App\Http\Controllers\Settings\NotificationPreferencesController::class, 'update'])->middleware('throttle:30,1')->name('notifications.update');
+
     Route::get('settings/appearance', function () {
         return Inertia::render('settings/appearance');
     })->name('appearance');

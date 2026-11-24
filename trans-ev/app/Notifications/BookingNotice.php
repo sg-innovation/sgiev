@@ -4,29 +4,28 @@ namespace App\Notifications;
 
 use App\Models\Booking;
 use App\Models\Station;
-use App\Support\Messages;
+use App\Notifications\Concerns\TemplatedMessage;
 use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-/** Booking emails whose wording lives in Message templates (reminders, no-show, running-late acknowledgement…). */
+/** Booking messages whose wording lives in Message templates (reminders, no-show, reschedule, waiting list…). */
 class BookingNotice extends Notification
 {
-    use Queueable;
+    use Queueable, TemplatedMessage;
 
     public function __construct(public string $template, public Booking $booking, public array $vars = []) {}
 
-    public function via(object $notifiable): array
+    public function messageKey(): string
     {
-        return Messages::enabled($this->template) ? ['mail'] : [];
+        return $this->template;
     }
 
-    public function toMail(object $notifiable): MailMessage
+    public function messageVars(object $notifiable): array
     {
         $b = $this->booking->loadMissing(['station', 'charger']);
         $tz = Station::TIMEZONE;
 
-        return Messages::mail($this->template, [
+        return [
             'name' => $notifiable->name ?? ($b->customer_snapshot['name'] ?? ''),
             'booking_code' => $b->code,
             'station' => $b->station->name,
@@ -34,6 +33,11 @@ class BookingNotice extends Notification
             'slot' => $b->start_at->setTimezone($tz)->format('D, j M, g:i A').' – '.$b->end_at->setTimezone($tz)->format('g:i A'),
             'start_time' => $b->start_at->setTimezone($tz)->format('g:i A'),
             'charger' => (string) $b->charger?->code,
-        ] + $this->vars, route('bookings.show', $b));
+        ] + $this->vars;
+    }
+
+    public function messageUrl(object $notifiable): ?string
+    {
+        return route('bookings.show', $this->booking);
     }
 }

@@ -2,25 +2,29 @@
 
 namespace App\Notifications;
 
-use App\Support\Messages;
+use App\Notifications\Concerns\TemplatedMessage;
 use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-/** Partner onboarding / approval updates to company owners (wording from Message templates). */
+/** Partner onboarding / approval / wallet / reconciliation updates to staff (wording from Message templates). */
 class PartnerUpdate extends Notification
 {
-    use Queueable;
+    use Queueable, TemplatedMessage;
 
     public function __construct(public string $template, public array $vars = []) {}
 
-    public function via(object $notifiable): array
+    public function messageKey(): string
     {
-        return Messages::enabled($this->template) ? ['mail'] : [];
+        return $this->template;
     }
 
-    public function toMail(object $notifiable): MailMessage
+    public function messageVars(object $notifiable): array
     {
-        return Messages::mail($this->template, ['name' => $notifiable->name ?? ''] + $this->vars, url('/admin'));
+        return ['name' => $notifiable->name ?? ''] + $this->vars;
+    }
+
+    public function messageUrl(object $notifiable): ?string
+    {
+        return url('/admin');
     }
 }

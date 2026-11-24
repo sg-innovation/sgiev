@@ -163,6 +163,51 @@ Please review them in Billing & GST → Reconciliation."],
     private static ?array $cache = null;
 
     /** Build a mail message from the template (falls back to the first-install wording). */
+    /**
+     * D1: first-install SMS / WhatsApp / push wording for customer-facing messages. SMS in India must use DLT-registered
+     * templates and WhatsApp must use Meta-approved templates: set their IDs/names in Admin → Message templates.
+     * Push: subject = title, body = text.
+     */
+    public const CHANNEL_DEFAULTS = [
+        'booking.confirmed' => [
+            'whatsapp' => ['body' => 'Your Trans EV booking {{booking_code}} at {{station}} is confirmed for {{slot}}. Paid Rs {{amount}}.'],
+            'push' => ['subject' => 'Booking confirmed', 'body' => '{{station}}, {{slot}}. Show your check-in pass when you arrive.'],
+        ],
+        'booking.reminder' => [
+            'sms' => ['body' => 'Trans EV: your charging slot {{booking_code}} at {{station}} starts at {{start_time}}. Running late? Tell us in the app.'],
+            'whatsapp' => ['body' => 'Reminder: your charging slot {{booking_code}} at {{station}} starts at {{start_time}}.'],
+            'push' => ['subject' => 'Slot starts in {{minutes}} min', 'body' => '{{station}} at {{start_time}}, charger {{charger}}.'],
+        ],
+        'booking.starting' => [
+            'push' => ['subject' => 'Your slot has started', 'body' => 'Charger {{charger}} at {{station}} is waiting for you.'],
+        ],
+        'booking.no_show' => [
+            'sms' => ['body' => 'Trans EV: booking {{booking_code}} was released as a no-show. Rs {{refund}} is being refunded as per the policy.'],
+            'push' => ['subject' => 'Missed slot', 'body' => 'Booking {{booking_code}} was released. Rs {{refund}} is being refunded.'],
+        ],
+        'booking.rescheduled' => [
+            'sms' => ['body' => 'Trans EV: booking {{booking_code}} moved to {{slot}}, charger {{charger}}.'],
+            'push' => ['subject' => 'Booking moved', 'body' => 'New time: {{slot}}, charger {{charger}}.'],
+        ],
+        'waitlist.offer' => [
+            'sms' => ['body' => 'Trans EV: a slot opened at {{station}} ({{slot}}). Pay by {{expires}} to confirm, booking {{booking_code}}.'],
+            'whatsapp' => ['body' => 'A charging slot opened at {{station}}: {{slot}}. Pay by {{expires}} to confirm booking {{booking_code}}.'],
+            'push' => ['subject' => 'A slot opened up', 'body' => '{{station}}, {{slot}}. Pay within {{minutes}} minutes to confirm.'],
+        ],
+        'booking.trueup' => [
+            'push' => ['subject' => 'Charging complete', 'body' => '{{kwh}} kWh delivered. Final bill Rs {{final}}.'],
+        ],
+        'ticket.agent_reply' => [
+            'push' => ['subject' => 'Support replied', 'body' => 'New reply on ticket {{number}}: {{subject}}'],
+        ],
+    ];
+
+    /** Built-in wording for a message on a channel (email/SMS from TEMPLATES, others from CHANNEL_DEFAULTS). */
+    public static function definition(string $key, string $channel): ?array
+    {
+        return self::TEMPLATES[$key][$channel] ?? self::CHANNEL_DEFAULTS[$key][$channel] ?? null;
+    }
+
     public static function mail(string $key, array $vars, ?string $actionUrl = null): MailMessage
     {
         $t = self::template($key, 'mail');
@@ -186,7 +231,7 @@ Please review them in Billing & GST → Reconciliation."],
     {
         $row = self::stored()[$key.'|'.$channel] ?? null;
 
-        return $row ? (bool) $row->is_active : isset(self::TEMPLATES[$key][$channel]);
+        return $row ? (bool) $row->is_active : self::definition($key, $channel) !== null;
     }
 
     /** Plain-text SMS body (null when there is no active SMS template). */
@@ -202,10 +247,10 @@ Please review them in Billing & GST → Reconciliation."],
     {
         $row = self::stored()[$key.'|'.$channel] ?? null;
         if ($row !== null) {
-            return $row->is_active ? ['subject' => $row->subject, 'body' => $row->body, 'action_label' => $row->action_label] : [];
+            return $row->is_active ? ['subject' => $row->subject, 'body' => $row->body, 'action_label' => $row->action_label, 'dlt_template_id' => $row->dlt_template_id] : [];
         }
 
-        return self::TEMPLATES[$key][$channel] ?? [];
+        return self::definition($key, $channel) ?? [];
     }
 
     /** Replace {{var}}. Variable values are escaped so customer-entered text cannot inject markup or links. */

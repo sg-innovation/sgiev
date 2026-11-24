@@ -38,6 +38,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     protected function casts(): array
     {
         return [
+            'notification_prefs' => 'array',
             'email_verified_at' => 'datetime',
             'blocked_at' => 'datetime',
             'last_login_at' => 'datetime',

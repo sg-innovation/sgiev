@@ -5,30 +5,29 @@ namespace App\Notifications;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\Station;
+use App\Notifications\Concerns\TemplatedMessage;
 use App\Support\BusinessRules;
-use App\Support\Messages;
 use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-/** Wording: Admin → Content → Message templates → “Booking confirmed”. */
+/** Booking confirmed after payment (email / SMS / WhatsApp / push from Message templates). */
 class BookingConfirmed extends Notification
 {
-    use Queueable;
+    use Queueable, TemplatedMessage;
 
     public function __construct(public Booking $booking, public Payment $payment) {}
 
-    public function via(object $notifiable): array
+    public function messageKey(): string
     {
-        return Messages::enabled('booking.confirmed') ? ['mail'] : [];
+        return 'booking.confirmed';
     }
 
-    public function toMail(object $notifiable): MailMessage
+    public function messageVars(object $notifiable): array
     {
         $b = $this->booking;
         $tz = Station::TIMEZONE;
 
-        return Messages::mail('booking.confirmed', [
+        return [
             'name' => $notifiable->name ?? '',
             'booking_code' => $b->code,
             'station' => $b->station->name,
@@ -37,6 +36,11 @@ class BookingConfirmed extends Notification
             'amount' => number_format((float) ($this->payment->paid_amount ?? $this->payment->amount), 2),
             'payment_ref' => (string) $this->payment->gateway_txn_id,
             'no_show_minutes' => (string) BusinessRules::int('booking.no_show_minutes'),
-        ], route('bookings.show', $b));
+        ];
+    }
+
+    public function messageUrl(object $notifiable): ?string
+    {
+        return route('bookings.show', $this->booking);
     }
 }

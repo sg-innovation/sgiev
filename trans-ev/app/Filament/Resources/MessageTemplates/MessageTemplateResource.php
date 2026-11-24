@@ -78,14 +78,19 @@ class MessageTemplateResource extends Resource
     {
         return $schema->columns(3)->components([
             Section::make()->columnSpan(2)->schema([
-                TextInput::make('subject')->maxLength(200)->visible(fn (Get $get, ?MessageTemplate $record) => $record?->channel === 'mail')->required(fn (?MessageTemplate $record) => $record?->channel === 'mail'),
-                Textarea::make('body')->required()->rows(10)->maxLength(fn (?MessageTemplate $record) => $record?->channel === 'sms' ? 480 : 5000)
-                    ->helperText(fn (?MessageTemplate $record) => $record?->channel === 'mail'
-                        ? 'Separate paragraphs with a blank line. Start a paragraph with “# ” to make it the greeting.'
-                        : 'Plain text. Must match the DLT-registered template word for word.'),
+                TextInput::make('subject')->label(fn (?MessageTemplate $record) => $record?->channel === 'push' ? 'Notification title' : 'Subject')->maxLength(fn (?MessageTemplate $record) => $record?->channel === 'push' ? 65 : 200)
+                    ->visible(fn (Get $get, ?MessageTemplate $record) => in_array($record?->channel, ['mail', 'push'], true))->required(fn (?MessageTemplate $record) => $record?->channel === 'mail'),
+                Textarea::make('body')->required()->rows(10)->maxLength(fn (?MessageTemplate $record) => match ($record?->channel) { 'sms' => 480, 'push' => 240, 'whatsapp' => 1024, default => 5000 })
+                    ->helperText(fn (?MessageTemplate $record) => match ($record?->channel) {
+                        'mail' => 'Separate paragraphs with a blank line. Start a paragraph with “# ” to make it the greeting.',
+                        'sms' => 'Plain text. Must match the DLT-registered template word for word; MSG91 flow variables use the same names (##booking_code##…).',
+                        'whatsapp' => 'Preview of the approved Meta template. The {{variables}} here, in order, fill the template’s {{1}}, {{2}}…',
+                        default => 'Short text shown on the phone’s lock screen.',
+                    }),
                 TextInput::make('action_label')->label('Button text')->maxLength(60)->visible(fn (?MessageTemplate $record) => $record?->channel === 'mail'),
-                TextInput::make('dlt_template_id')->label('DLT template ID')->maxLength(40)->visible(fn (?MessageTemplate $record) => $record?->channel === 'sms'),
-                Toggle::make('is_active')->label('Send this message')->helperText('Turned off: the email or SMS is not sent.'),
+                TextInput::make('dlt_template_id')->label(fn (?MessageTemplate $record) => $record?->channel === 'whatsapp' ? 'Approved WhatsApp template name' : 'DLT template ID (MSG91 flow ID)')
+                    ->maxLength(40)->visible(fn (?MessageTemplate $record) => in_array($record?->channel, ['sms', 'whatsapp'], true)),
+                Toggle::make('is_active')->label('Send this message')->helperText('Turned off: this channel is not used for this message.'),
             ]),
             Section::make('Variables')->columnSpan(1)->schema([
                 TextEntry::make('vars')->hiddenLabel()->state(fn (?MessageTemplate $record) => new HtmlString(
@@ -100,13 +105,23 @@ class MessageTemplateResource extends Resource
         return $table->defaultSort('key')
             ->columns([
                 TextColumn::make('key')->label('Message')->formatStateUsing(fn ($state, MessageTemplate $record) => static::label($record))->description(fn (MessageTemplate $record) => $record->subject)->wrap()->searchable(),
-                TextColumn::make('channel')->badge()->formatStateUsing(fn (string $state) => strtoupper($state))->color(fn (string $state) => $state === 'mail' ? 'info' : 'warning'),
+                TextColumn::make('channel')->badge()->formatStateUsing(fn (string $state) => \App\Models\NotificationDelivery::CHANNELS[$state] ?? $state)
+                    ->color(fn (string $state) => match ($state) { 'mail' => 'info', 'sms' => 'warning', 'whatsapp' => 'success', default => 'gray' })
+                    ->description(fn (MessageTemplate $record) => in_array($record->channel, ['sms', 'whatsapp'], true) && blank($record->dlt_template_id) ? 'Template ID needed before going live' : null),
                 IconColumn::make('is_active')->label('Active')->boolean(),
                 TextColumn::make('updated_at')->label('Last changed')->since(),
             ])
-            ->filters([SelectFilter::make('channel')->options(['mail' => 'Email', 'sms' => 'SMS'])])
+            ->filters([SelectFilter::make('channel')->options(\App\Models\NotificationDelivery::CHANNELS)])
             ->recordActions([
                 EditAction::make(),
+                Action::make('test')->label('Send test')->icon('heroicon-m-paper-airplane')->color('gray')
+                    ->modalDescription(fn (MessageTemplate $record) => 'Sends this '.(\App\Models\NotificationDelivery::CHANNELS[$record->channel] ?? $record->channel).' message to you with sample values. Check the result in the Notification log.')
+                    ->action(function (MessageTemplate $record) {
+                        $sample = collect(Messages::TEMPLATES[$record->key]['vars'] ?? [])->mapWithKeys(fn ($d, $k) => [$k => $d])->all();
+                        $n = new \App\Notifications\TemplateTest($record->key, $record->channel, $sample);
+                        auth()->user()->notifyNow($n);
+                        \Filament\Notifications\Notification::make()->success()->title('Test sent')->body('See Settings → Notification log for the result.')->send();
+                    }),
                 Action::make('preview')->icon('heroicon-m-eye')->color('gray')->modalSubmitAction(false)
                     ->visible(fn (MessageTemplate $record) => $record->channel === 'mail')
                     ->modalContent(function (MessageTemplate $record) {

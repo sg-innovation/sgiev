@@ -3,24 +3,23 @@
 namespace App\Notifications;
 
 use App\Models\Booking;
-use App\Support\Messages;
+use App\Notifications\Concerns\TemplatedMessage;
 use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /** Charging summary after the session: energy delivered, final bill, refund or balance (wording from Message templates). */
 class BookingTrueUp extends Notification
 {
-    use Queueable;
+    use Queueable, TemplatedMessage;
 
     public function __construct(public Booking $booking) {}
 
-    public function via(object $notifiable): array
+    public function messageKey(): string
     {
-        return Messages::enabled('booking.trueup') ? ['mail'] : [];
+        return 'booking.trueup';
     }
 
-    public function toMail(object $notifiable): MailMessage
+    public function messageVars(object $notifiable): array
     {
         $b = $this->booking;
         $diff = (float) $b->trueup_amount;
@@ -32,10 +31,15 @@ class BookingTrueUp extends Notification
             default => 'Your prepaid amount covers the energy delivered. There is nothing more to pay.',
         };
 
-        return Messages::mail('booking.trueup', [
+        return [
             'name' => $notifiable->name ?? ($b->customer_snapshot['name'] ?? ''), 'booking_code' => $b->code, 'station' => $b->station?->name ?? '',
             'kwh' => number_format((float) $b->final_kwh, 2), 'prepaid' => number_format((float) $b->total_amount, 2),
             'final' => number_format((float) $b->final_total, 2), 'outcome' => $outcome,
-        ], route('bookings.show', $b));
+        ];
+    }
+
+    public function messageUrl(object $notifiable): ?string
+    {
+        return route('bookings.show', $this->booking);
     }
 }
