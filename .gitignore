@@ -1,0 +1,10 @@
+# Local tooling
+.claude/
+.DS_Store
+Thumbs.db
+*.log
+
+# Never commit environment files anywhere in the tree
+.env
+.env.*
+!.env.example

@@ -1,0 +1,234 @@
+@import 'tailwindcss';
+
+@plugin 'tailwindcss-animate';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+    --font-display: 'Poppins', 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --color-volt: #00e5a8;
+    --color-volt-600: #00b386;
+    --color-electric: #0077ff;
+    --color-ink: #0b1b2b;
+    --font-sans:
+        'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --radius-lg: var(--radius);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-sm: calc(var(--radius) - 4px);
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+
+    --color-sidebar: var(--sidebar-background);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+        border-color: var(--border, currentColor);
+    }
+}
+
+:root {
+    --background: hsl(0, 0%, 100%);
+    --foreground: hsl(211, 59%, 11%);
+    --card: hsl(0, 0%, 100%);
+    --card-foreground: hsl(0, 0%, 3.9%);
+    --popover: hsl(0, 0%, 100%);
+    --popover-foreground: hsl(0, 0%, 3.9%);
+    --primary: hsl(164, 100%, 35%);
+    --primary-foreground: hsl(0, 0%, 100%);
+    --secondary: hsl(210, 40%, 96%);
+    --secondary-foreground: hsl(0, 0%, 9%);
+    --muted: hsl(210, 40%, 96%);
+    --muted-foreground: hsl(215, 16%, 40%);
+    --accent: hsl(0, 0%, 96.1%);
+    --accent-foreground: hsl(0, 0%, 9%);
+    --destructive: hsl(0, 84.2%, 60.2%);
+    --destructive-foreground: hsl(0, 0%, 98%);
+    --border: hsl(214, 32%, 90%);
+    --input: hsl(0, 0%, 89.8%);
+    --ring: hsl(164, 100%, 35%);
+    --chart-1: hsl(12, 76%, 61%);
+    --chart-2: hsl(173, 58%, 39%);
+    --chart-3: hsl(197, 37%, 24%);
+    --chart-4: hsl(43, 74%, 66%);
+    --chart-5: hsl(27, 87%, 67%);
+    --radius: 0.5rem;
+    --sidebar-background: hsl(0, 0%, 98%);
+    --sidebar-foreground: hsl(240, 5.3%, 30%);
+    --sidebar-primary: hsl(0, 0%, 10%);
+    --sidebar-primary-foreground: hsl(0, 0%, 98%);
+    --sidebar-accent: hsl(0, 0%, 94%);
+    --sidebar-accent-foreground: hsl(0, 0%, 30%);
+    --sidebar-border: hsl(0, 0%, 91%);
+    --sidebar-ring: hsl(217.2, 91.2%, 59.8%);
+}
+
+.dark {
+    --background: hsl(214, 60%, 5%);
+    --foreground: hsl(210, 40%, 96%);
+    --card: hsl(214, 45%, 9%);
+    --card-foreground: hsl(210, 40%, 96%);
+    --popover: hsl(214, 45%, 9%);
+    --popover-foreground: hsl(210, 40%, 96%);
+    --primary: hsl(164, 100%, 45%);
+    --primary-foreground: hsl(214, 60%, 8%);
+    --secondary: hsl(214, 35%, 14%);
+    --secondary-foreground: hsl(210, 40%, 96%);
+    --muted: hsl(214, 38%, 12%);
+    --muted-foreground: hsl(214, 20%, 72%);
+    --accent: hsl(214, 35%, 15%);
+    --accent-foreground: hsl(210, 40%, 96%);
+    --destructive: hsl(0, 84%, 60%);
+    --destructive-foreground: hsl(0, 0%, 98%);
+    --border: hsl(214, 30%, 19%);
+    --input: hsl(214, 30%, 22%);
+    --ring: hsl(164, 100%, 45%);
+    --chart-1: hsl(164, 100%, 45%);
+    --chart-2: hsl(212, 100%, 55%);
+    --chart-3: hsl(30, 80%, 55%);
+    --chart-4: hsl(280, 65%, 60%);
+    --chart-5: hsl(340, 75%, 55%);
+    --sidebar-background: hsl(214, 50%, 7%);
+    --sidebar-foreground: hsl(210, 30%, 85%);
+    --sidebar-primary: hsl(164, 100%, 45%);
+    --sidebar-primary-foreground: hsl(214, 60%, 8%);
+    --sidebar-accent: hsl(214, 35%, 14%);
+    --sidebar-accent-foreground: hsl(210, 40%, 96%);
+    --sidebar-border: hsl(214, 30%, 16%);
+    --sidebar-ring: hsl(164, 100%, 45%);
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+        overflow-x: clip;
+    }
+}
+
+/* MapLibre popups follow the site theme */
+.maplibregl-popup-content {
+    @apply rounded-xl bg-card p-0 text-card-foreground shadow-xl;
+}
+.maplibregl-popup-tip {
+    display: none;
+}
+
+@keyframes charge-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgb(0 229 168 / 0.55); }
+    50% { box-shadow: 0 0 0 10px rgb(0 229 168 / 0); }
+}
+.animate-charge-pulse {
+    animation: charge-pulse 2s ease-in-out infinite;
+}
+
+/* Brighter brand accents on dark surfaces for readable contrast */
+.dark .text-electric {
+    color: #5aaeff;
+}
+.dark .text-volt-600 {
+    color: #19e3ae;
+}
+
+/* Entrance animation that always ends visible (no dependency on scroll observers) */
+@keyframes rise-in {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: none; }
+}
+.rise-in {
+    animation: rise-in 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+    .rise-in, .animate-charge-pulse { animation: none; }
+}
+
+/* Long-form legal text */
+.legal-prose p { margin-bottom: 0.9rem; line-height: 1.75; color: var(--muted-foreground); }
+.legal-prose strong { color: var(--foreground); font-weight: 600; }
+.legal-prose ul { list-style: disc; padding-left: 1.4rem; margin-bottom: 0.9rem; color: var(--muted-foreground); }
+.legal-prose li { margin-bottom: 0.45rem; line-height: 1.7; }
+.legal-prose a { color: var(--color-volt-600); font-weight: 500; }
+.dark .legal-prose a { color: #19e3ae; }
+.legal-prose a:hover { text-decoration: underline; }
+.legal-prose table { width: 100%; font-size: 0.9rem; border-collapse: collapse; }
+.legal-prose th { text-align: left; background: var(--muted); padding: 0.75rem 1rem; color: var(--foreground); }
+.legal-prose td { padding: 0.75rem 1rem; border-top: 1px solid var(--border); color: var(--muted-foreground); }
+
+/* Blog article typography */
+.blog-prose { font-size: 1.075rem; line-height: 1.85; color: var(--foreground); }
+.blog-prose > * + * { margin-top: 1.15em; }
+.blog-prose p { color: color-mix(in oklab, var(--foreground) 82%, transparent); }
+.blog-prose h2 { font-family: var(--font-display); font-size: 1.65rem; line-height: 1.25; font-weight: 700; margin-top: 2.2em; scroll-margin-top: 6rem; }
+.blog-prose h3 { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; margin-top: 1.8em; scroll-margin-top: 6rem; }
+.blog-prose ul, .blog-prose ol { padding-left: 1.4em; color: color-mix(in oklab, var(--foreground) 82%, transparent); }
+.blog-prose ul { list-style: disc; }
+.blog-prose ol { list-style: decimal; }
+.blog-prose li { margin: 0.45em 0; padding-left: 0.2em; }
+.blog-prose li::marker { color: var(--color-volt-600); font-weight: 700; }
+.blog-prose a { color: var(--color-volt-600); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.dark .blog-prose a { color: #19e3ae; }
+.blog-prose strong { color: var(--foreground); font-weight: 650; }
+.blog-prose blockquote { border-left: 4px solid var(--color-volt); background: var(--muted); padding: 1rem 1.25rem; border-radius: 0 1rem 1rem 0; font-style: italic; }
+.blog-prose img { border-radius: 1.25rem; width: 100%; height: auto; }
+.blog-prose pre { background: var(--color-ink); color: #e2e8f0; padding: 1rem 1.25rem; border-radius: 1rem; overflow-x: auto; font-size: 0.9rem; }
+.blog-prose table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.blog-prose th, .blog-prose td { border: 1px solid var(--border); padding: 0.6rem 0.8rem; text-align: left; }
+.blog-prose th { background: var(--muted); }
+.blog-prose hr { border-color: var(--border); margin: 2.5em 0; }
