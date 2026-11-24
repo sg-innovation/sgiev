@@ -98,6 +98,13 @@ class ActionCentre extends Widget
                 ContactMessage::where('status', 'new')->count(), ContactMessageResource::getUrl('index'), 'info', 'heroicon-o-inbox');
         }
 
+        if (auth()->user()?->can('tickets.view')) {
+            $overdue = \App\Filament\Resources\Tickets\TicketResource::getEloquentQuery()->whereIn('status', ['open', 'in_progress'])->whereNull('sla_paused_at')
+                ->where(fn ($q) => $q->where(fn ($a) => $a->whereNull('first_responded_at')->where('first_response_due_at', '<', now()))->orWhere('resolution_due_at', '<', now()))->count();
+            $items[] = $this->item('Tickets past their SLA', 'Escalated to support leads; reply or reassign', $overdue,
+                \App\Filament\Resources\Tickets\TicketResource::getUrl('index'), 'danger', 'heroicon-o-lifebuoy');
+        }
+
         $holds = static::scopedBookings()->where('status', BookingStatus::Held)->where('hold_expires_at', '>', now())->count();
         $items[] = $this->item('Slots waiting for payment', 'Held for up to 10 minutes, then released automatically', $holds, BookingResource::getUrl('index'), 'gray', 'heroicon-o-clock');
 

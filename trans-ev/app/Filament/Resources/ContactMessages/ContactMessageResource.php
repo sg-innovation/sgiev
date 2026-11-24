@@ -113,7 +113,23 @@ class ContactMessageResource extends Resource
                 SelectFilter::make('status')->options(ContactMessage::STATUSES)->default('new'),
                 SelectFilter::make('topic')->options(fn () => \App\Models\Lookup::options('contact_topic', true)),
             ])
-            ->recordActions([ViewAction::make(), EditAction::make()->label('Handle')]);
+            ->recordActions([
+                ViewAction::make(), EditAction::make()->label('Handle'),
+                \Filament\Actions\Action::make('toTicket')->label('Convert to ticket')->icon('heroicon-m-lifebuoy')->color('gray')
+                    ->visible(fn ($record) => ! $record->ticket_id && auth()->user()->can('tickets.reply'))
+                    ->requiresConfirmation()
+                    ->modalDescription(fn ($record) => \App\Models\User::query()->where('email', strtolower($record->email))->exists()
+                        ? 'Opens a support ticket for this customer’s account, with this message as the first post.'
+                        : 'No account uses '.$record->email.'. A customer account will be created and a set-password link emailed, so they can follow the ticket.')
+                    ->action(function ($record) {
+                        $t = app(\App\Services\TicketService::class)->fromContactMessage($record, auth()->user());
+                        \Filament\Notifications\Notification::make()->success()->title("Ticket {$t->number} opened")
+                            ->actions([\Filament\Actions\Action::make('open')->label('Open ticket')->url(\App\Filament\Resources\Tickets\TicketResource::getUrl('view', ['record' => $t]))])->send();
+                    }),
+                \Filament\Actions\Action::make('openTicket')->label('Open ticket')->icon('heroicon-m-arrow-top-right-on-square')->color('gray')
+                    ->visible(fn ($record) => (bool) $record->ticket_id)
+                    ->url(fn ($record) => \App\Filament\Resources\Tickets\TicketResource::getUrl('view', ['record' => $record->ticket_id])),
+            ]);
     }
 
     public static function getNavigationBadge(): ?string

@@ -165,6 +165,93 @@ class TicketService
         }
     }
 
+    /**
+     * D2 SLA watcher (scheduled every 5 minutes): warn the assignee shortly before a deadline, then on a breach mark it,
+     * raise the escalation level and alert the support leads (tickets.manage) of the handling company and Trans EV.
+     * Returns the number of tickets that breached in this run.
+     */
+    public function checkSla(): int
+    {
+        $warn = \App\Support\BusinessRules::int('tickets.sla_warning_minutes');
+        $breached = 0;
+        Ticket::query()->whereIn('status', ['open', 'in_progress'])->whereNull('sla_paused_at')->with(['assignee', 'priority'])->get()
+            ->each(function (Ticket $t) use ($warn, &$breached) {
+                $firstDue = ! $t->first_responded_at && $t->first_response_due_at ? $t->first_response_due_at : null;
+                if ($firstDue && $firstDue->isPast() && ! $t->first_response_breached_at) {
+                    $this->breach($t, 'first_response_breached_at', 'first reply');
+                    $breached++;
+
+                    return;
+                }
+                if ($t->resolution_due_at && $t->resolution_due_at->isPast() && ! $t->resolution_breached_at) {
+                    $this->breach($t, 'resolution_breached_at', 'resolution');
+                    $breached++;
+
+                    return;
+                }
+                $next = collect([$firstDue, $t->resolution_breached_at ? null : $t->resolution_due_at])->filter()->min();
+                if ($warn > 0 && $next && ! $t->sla_warned_at && $next->isFuture() && $next->lte(now()->addMinutes($warn))) {
+                    $t->forceFill(['sla_warned_at' => now()])->save();
+                    $this->event($t, null, 'SLA due at '.$next->timezone(\App\Models\Station::TIMEZONE)->format('g:i A'));
+                    $to = $t->assignee ? collect([$t->assignee]) : $this->leads($t);
+                    $to->each(fn (User $u) => $u->notify(new TicketUpdate($t, 'ticket.sla_warning', ['due' => $next->timezone(\App\Models\Station::TIMEZONE)->format('j M, g:i A')])));
+                }
+            });
+
+        return $breached;
+    }
+
+    private function breach(Ticket $t, string $field, string $what): void
+    {
+        $t->forceFill([$field => now(), 'escalation_level' => $t->escalation_level + 1, 'escalated_at' => now()])->save();
+        $this->event($t, null, "SLA breached ({$what}); escalated to level {$t->escalation_level}");
+        $recipients = $this->leads($t)->merge($t->assignee ? [$t->assignee] : [])->unique('id');
+        $recipients->each(fn (User $u) => $u->notify(new TicketUpdate($t, 'ticket.sla_breach', ['what' => $what, 'level' => (string) $t->escalation_level])));
+    }
+
+    /** Support leads: tickets.manage in the handling company, plus Trans EV leads for operator-handled tickets. */
+    private function leads(Ticket $t): Collection
+    {
+        $platform = Company::query()->where('is_platform', true)->value('id');
+
+        return User::query()->whereNull('blocked_at')->permission('tickets.manage')->whereIn('company_id', array_unique([$t->company_id, $platform]))->limit(20)->get();
+    }
+
+    /**
+     * Contact form → ticket. Signed-in users get a ticket straight away; for guests staff convert the message, which
+     * finds or creates the customer account (a set-password link is emailed).
+     */
+    public function fromContactMessage(\App\Models\ContactMessage $msg, ?User $by = null): Ticket
+    {
+        if ($msg->ticket_id) {
+            return Ticket::query()->findOrFail($msg->ticket_id);
+        }
+        $user = $msg->user ?? User::query()->where('email', strtolower($msg->email))->first();
+        $created = false;
+        if (! $user) {
+            $user = User::query()->create(['name' => $msg->name, 'email' => strtolower($msg->email), 'password' => \Illuminate\Support\Facades\Hash::make(Str::random(40))]);
+            $user->forceFill(['phone' => $msg->phone])->save();
+            $user->assignRole(\App\Enums\Role::Customer->value);
+            $created = true;
+        }
+        $category = TicketCategory::query()->for($user)->where('contact_topic', $msg->topic)->first()
+            ?? TicketCategory::query()->for($user)->where('requires_booking', false)->orderBy('sort')->firstOrFail();
+        $booking = $msg->booking_code ? Booking::query()->where('code', $msg->booking_code)->where('user_id', $user->id)->first() : null;
+        if ($category->requires_booking && ! $booking) {
+            $category = TicketCategory::query()->for($user)->where('requires_booking', false)->orderBy('sort')->firstOrFail();
+        }
+        $ticket = $this->open($user, $category, $msg->subject, $msg->message.($msg->booking_code && ! $booking ? "\n\nBooking code given: {$msg->booking_code}" : ''), null, $booking);
+        $ticket->forceFill(['channel' => 'contact', 'contact_message_id' => $msg->id])->save();
+        $msg->forceFill(['ticket_id' => $ticket->id, 'status' => 'resolved', 'resolved_at' => now(),
+            'internal_notes' => trim(($msg->internal_notes ?? '')."\nConverted to ticket {$ticket->number}".($by ? " by {$by->name}" : ''))])->save();
+        $this->event($ticket, $by, 'Created from contact form message '.$msg->reference);
+        if ($created) {
+            \Illuminate\Support\Facades\Password::broker()->sendResetLink(['email' => $user->email]);
+        }
+
+        return $ticket;
+    }
+
     /** Close tickets resolved more than N days ago (N from config/settings). */
     public function autoClose(): int
     {
@@ -226,6 +313,19 @@ class TicketService
     private function applyStatusDates(Ticket $ticket, array &$changes): void
     {
         $status = $changes['status'] ?? $ticket->status;
+        // D2: the SLA clock stops while we wait on the requester and while resolved; the resolution deadline moves by the paused time.
+        $paused = in_array($status, ['waiting_on_customer', 'resolved', 'closed'], true);
+        if ($paused && ! $ticket->sla_paused_at) {
+            $changes['sla_paused_at'] = now();
+        } elseif (! $paused && $ticket->sla_paused_at) {
+            $mins = (int) $ticket->sla_paused_at->diffInMinutes(now(), true);
+            $changes['sla_paused_at'] = null;
+            $changes['sla_paused_minutes'] = $ticket->sla_paused_minutes + $mins;
+            if ($ticket->resolution_due_at && ! $ticket->resolution_breached_at) {
+                $changes['resolution_due_at'] = $ticket->resolution_due_at->copy()->addMinutes($mins);
+            }
+            $changes['sla_warned_at'] = null;
+        }
         if ($status === 'resolved' && ! $ticket->resolved_at) {
             $changes['resolved_at'] = now();
         }

@@ -26,7 +26,8 @@ class Ticket extends Model
     protected function casts(): array
     {
         return [
-            'first_response_due_at' => 'datetime', 'resolution_due_at' => 'datetime', 'first_responded_at' => 'datetime',
+            'first_response_due_at' => 'datetime', 'resolution_due_at' => 'datetime', 'sla_paused_at' => 'datetime', 'sla_warned_at' => 'datetime',
+            'first_response_breached_at' => 'datetime', 'resolution_breached_at' => 'datetime', 'escalated_at' => 'datetime', 'first_responded_at' => 'datetime',
             'resolved_at' => 'datetime', 'closed_at' => 'datetime', 'last_activity_at' => 'datetime',
         ];
     }
@@ -97,18 +98,24 @@ class Ticket extends Model
         return in_array($this->status, self::ACTIVE, true);
     }
 
-    /** First-response or resolution SLA breached (or about to be). */
+    /** breached / overdue / due_soon / on_track / paused (waiting on requester), or null when closed. */
     public function slaState(): ?string
     {
         if (! $this->isActive()) {
-            return null;
+            return $this->first_response_breached_at || $this->resolution_breached_at ? 'breached' : null;
+        }
+        if ($this->sla_paused_at) {
+            return 'paused';
         }
         $due = $this->first_responded_at ? $this->resolution_due_at : $this->first_response_due_at;
         if (! $due) {
             return null;
         }
+        if ($due->isPast()) {
+            return $this->first_response_breached_at || $this->resolution_breached_at ? 'breached' : 'overdue';
+        }
 
-        return $due->isPast() ? 'overdue' : ($due->diffInMinutes(now()) < 60 ? 'due_soon' : 'on_track');
+        return $due->diffInMinutes(now(), true) < max(1, \App\Support\BusinessRules::int('tickets.sla_warning_minutes')) ? 'due_soon' : 'on_track';
     }
 
     public function getActivitylogOptions(): LogOptions

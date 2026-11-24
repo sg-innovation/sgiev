@@ -79,6 +79,8 @@ class TicketCategoryResource extends Resource
             Select::make('default_priority_id')->label('Default priority')->options(fn () => TicketPriority::orderBy('sort')->pluck('name', 'id')->all()),
             TextInput::make('sort')->numeric()->integer()->default(10),
             Toggle::make('requires_booking')->label('Customer must choose a booking'),
+            \Filament\Forms\Components\Select::make('contact_topic')->label('Contact-form topic')->options(fn () => \App\Models\ContactMessage::topics())->placeholder('None')
+                ->helperText('Contact-form messages on this topic become tickets in this category.'),
             Toggle::make('is_active')->label('Active')->default(true),
         ]);
     }

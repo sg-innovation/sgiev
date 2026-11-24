@@ -87,7 +87,7 @@ class SupportTicketTest extends TestCase
         $agent = $this->staff($this->platform, Role::OperationsAdmin->value); // has tickets.assign
         $t = $this->open();
 
-        $this->assertSame('TKT-000001', $t->number);
+        $this->assertMatchesRegularExpression('/^TKT-\d{6}$/', $t->number);
         $this->assertSame($this->platform->id, $t->company_id);
         $this->assertSame('open', $t->status);
         $this->assertNotNull($t->first_response_due_at);

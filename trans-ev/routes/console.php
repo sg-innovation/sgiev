@@ -47,3 +47,6 @@ Schedule::call(fn () => app(\App\Services\NoShowService::class)->sweep())->name(
 
 // C7: offer freed slots to the waiting list (and pass lapsed offers on).
 Schedule::call(fn () => app(\App\Services\WaitlistService::class)->match())->name('waitlist:match')->everyMinute()->withoutOverlapping();
+
+// D2: ticket SLA warnings, breaches and escalation.
+Schedule::call(fn () => app(\App\Services\TicketService::class)->checkSla())->name('tickets:sla')->everyFiveMinutes()->withoutOverlapping();

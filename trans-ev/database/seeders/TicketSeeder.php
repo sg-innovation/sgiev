@@ -40,5 +40,11 @@ class TicketSeeder extends Seeder
                 'requires_booking' => $needsBooking, 'default_priority_id' => $p[$priority]->id, 'is_active' => true, 'sort' => $i + 1,
             ]);
         }
+        // D2: contact-form topic → category (only where not set, so admin changes are kept).
+        foreach (['booking' => 'booking', 'station' => 'charger-fault', 'payment' => 'payment-refund', 'feedback' => 'feedback', 'partner' => 'partner-onboarding', 'other' => 'other'] as $topic => $slug) {
+            if (! TicketCategory::query()->where('contact_topic', $topic)->exists()) {
+                TicketCategory::query()->where('slug', $slug)->whereNull('contact_topic')->update(['contact_topic' => $topic]);
+            }
+        }
     }
 }

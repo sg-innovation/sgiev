@@ -113,6 +113,16 @@ final class Messages
             'vars' => ['name' => 'Agent name', 'number' => 'Ticket number', 'subject' => 'Ticket subject'],
             'mail' => ['subject' => 'Ticket {{number}} assigned to you', 'action_label' => 'Open ticket', 'body' => "# Hello {{name}},\n\nA ticket has been assigned to you.\n\nTicket: {{number}} · {{subject}}"],
         ],
+        'ticket.sla_warning' => [
+            'label' => 'Ticket SLA due soon (to agent)',
+            'vars' => ['name' => 'Recipient name', 'number' => 'Ticket number', 'subject' => 'Subject', 'status' => 'Status', 'requester' => 'Requester', 'due' => 'Deadline'],
+            'mail' => ['subject' => 'Due soon: ticket {{number}}', 'action_label' => 'Open ticket', 'body' => "# Hello {{name}},\n\nTicket {{number}} ({{subject}}) from {{requester}} reaches its SLA deadline at **{{due}}**.\n\nPlease reply or update it before then."],
+        ],
+        'ticket.sla_breach' => [
+            'label' => 'Ticket SLA breached and escalated (to agents and leads)',
+            'vars' => ['name' => 'Recipient name', 'number' => 'Ticket number', 'subject' => 'Subject', 'status' => 'Status', 'requester' => 'Requester', 'what' => 'Which deadline', 'level' => 'Escalation level'],
+            'mail' => ['subject' => 'SLA breached: ticket {{number}}', 'action_label' => 'Open ticket', 'body' => "# Hello {{name}},\n\nTicket {{number}} ({{subject}}) from {{requester}} has missed its **{{what}}** deadline and is now escalated (level {{level}}).\n\nStatus: {{status}}. Please take it over or reassign it."],
+        ],
         'ticket.status' => [
             'label' => 'Support: ticket resolved or closed (to requester)',
             'vars' => ['name' => 'Requester name', 'number' => 'Ticket number', 'subject' => 'Ticket subject', 'status' => 'New status'],

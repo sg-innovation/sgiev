@@ -120,8 +120,8 @@ class TicketResource extends Resource
                 TextColumn::make('status')->badge()->formatStateUsing(fn (string $state) => Ticket::STATUSES[$state] ?? $state)
                     ->color(fn (string $state) => match ($state) { 'open' => 'info', 'in_progress' => 'primary', 'waiting_on_customer' => 'warning', 'resolved' => 'success', default => 'gray' }),
                 TextColumn::make('sla')->label('SLA')->badge()
-                    ->state(fn (Ticket $record) => match ($record->slaState()) { 'overdue' => 'Overdue', 'due_soon' => 'Due soon', 'on_track' => 'On track', default => null })
-                    ->color(fn (?string $state) => match ($state) { 'Overdue' => 'danger', 'Due soon' => 'warning', default => 'success' })
+                    ->state(fn (Ticket $record) => match ($record->slaState()) { 'breached' => 'Breached'.($record->escalation_level ? ' · L'.$record->escalation_level : ''), 'overdue' => 'Overdue', 'due_soon' => 'Due soon', 'on_track' => 'On track', 'paused' => 'Paused', default => null })
+                    ->color(fn (?string $state) => match (true) { str_starts_with((string) $state, 'Breached'), $state === 'Overdue' => 'danger', $state === 'Due soon' => 'warning', $state === 'Paused' => 'gray', default => 'success' })
                     ->tooltip(fn (Ticket $record) => ($record->first_responded_at ? 'Resolve by ' : 'First reply by ').($record->first_responded_at ? $record->resolution_due_at : $record->first_response_due_at)?->setTimezone($tz)->format('d M, h:i A'))
                     ->placeholder('—'),
                 TextColumn::make('assignee.name')->label('Assigned to')->placeholder('Unassigned'),
@@ -138,6 +138,8 @@ class TicketResource extends Resource
                 Filter::make('overdue')->label('SLA overdue')->query(fn (Builder $query) => $query->whereIn('status', Ticket::ACTIVE)
                     ->where(fn (Builder $q) => $q->where(fn (Builder $a) => $a->whereNull('first_responded_at')->where('first_response_due_at', '<', now()))
                         ->orWhere('resolution_due_at', '<', now()))),
+                Filter::make('breached')->label('SLA breached / escalated')->query(fn (Builder $query) => $query->where(fn (Builder $q) => $q->whereNotNull('first_response_breached_at')->orWhereNotNull('resolution_breached_at'))),
+                SelectFilter::make('channel')->label('Came from')->options(['web' => 'Website / app', 'contact' => 'Contact form', 'staff' => 'Raised by staff']),
                 Filter::make('raised_by_me')->label('Raised by me')->query(fn (Builder $query) => $query->where('requester_id', auth()->id())),
             ])
             ->recordUrl(fn (Ticket $record) => static::getUrl('view', ['record' => $record]))

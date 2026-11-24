@@ -40,6 +40,16 @@ class ContactController extends Controller
             'user_agent' => mb_substr((string) $request->userAgent(), 0, 255),
         ]);
 
+        if ($request->user() && ! $request->user()->isStaff()) {
+            try {
+                $ticket = app(\App\Services\TicketService::class)->fromContactMessage($msg);
+
+                return back()->with('success', "Thank you! We’ve opened support ticket {$ticket->number}. Follow it in My account → Support tickets.");
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Contact to ticket failed', ['ref' => $msg->reference, 'error' => $e->getMessage()]);
+            }
+        }
+
         return back()->with('success', "Thank you! Your query has been received. Reference: {$msg->reference}. We usually reply within one working day.");
     }
 }

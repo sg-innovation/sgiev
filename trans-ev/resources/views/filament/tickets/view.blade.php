@@ -59,7 +59,7 @@
                     <dt class="text-gray-500 dark:text-gray-400">SLA</dt>
                     <dd class="col-span-2 text-gray-800 dark:text-gray-100">
                         @if ($sla)
-                            <x-filament::badge :color="['overdue' => 'danger', 'due_soon' => 'warning', 'on_track' => 'success'][$sla]">{{ ['overdue' => 'Overdue', 'due_soon' => 'Due soon', 'on_track' => 'On track'][$sla] }}</x-filament::badge>
+                            <x-filament::badge :color="['breached' => 'danger', 'overdue' => 'danger', 'due_soon' => 'warning', 'on_track' => 'success', 'paused' => 'gray'][$sla] ?? 'gray'">{{ ['breached' => 'SLA breached'.($t->escalation_level ? ' · escalated L'.$t->escalation_level : ''), 'overdue' => 'Overdue', 'due_soon' => 'Due soon', 'on_track' => 'On track', 'paused' => 'SLA paused · waiting on requester'][$sla] ?? $sla }}</x-filament::badge>
                         @endif
                         <div class="mt-1 text-xs text-gray-500">First reply by {{ $t->first_response_due_at?->setTimezone($tz)->format('d M, h:i A') }}
                             @if ($t->first_responded_at) (replied {{ $t->first_responded_at->setTimezone($tz)->format('d M, h:i A') }}) @endif

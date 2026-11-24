@@ -46,6 +46,7 @@ final class BusinessRules
         'pricing.charging_efficiency' => ['group' => 'Pricing estimate', 'type' => 'decimal', 'default' => '0.90', 'min' => 0.5, 'max' => 1, 'label' => 'Charging efficiency', 'help' => 'Share of energy drawn from the charger that reaches the battery.'],
         'pricing.power_utilisation' => ['group' => 'Pricing estimate', 'type' => 'decimal', 'default' => '0.85', 'min' => 0.3, 'max' => 1, 'label' => 'Average power utilisation', 'help' => 'Average share of rated power a vehicle draws (charging slows near full).'],
         // Support
+        'tickets.sla_warning_minutes' => ['group' => 'Support tickets', 'type' => 'int', 'default' => 30, 'min' => 0, 'max' => 1440, 'label' => 'Warn the assignee this long before an SLA deadline (minutes)', 'help' => '0 = no warning.'],
         'tickets.auto_close_days' => ['group' => 'Support tickets', 'type' => 'int', 'default' => 7, 'min' => 1, 'max' => 60, 'label' => 'Close resolved tickets after (days)', 'help' => null],
         'tickets.max_files' => ['group' => 'Support tickets', 'type' => 'int', 'default' => 3, 'min' => 0, 'max' => 10, 'label' => 'Attachments per message', 'help' => null],
         'tickets.max_file_mb' => ['group' => 'Support tickets', 'type' => 'int', 'default' => 5, 'min' => 1, 'max' => 20, 'label' => 'Attachment size limit (MB)', 'help' => null],
