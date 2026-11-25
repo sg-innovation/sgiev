@@ -31,9 +31,7 @@ class AuthenticatedSessionController extends Controller
     {
         $request->authenticate();
 
-        $request->session()->regenerate();
-
-        return redirect()->intended(route('dashboard', absolute: false));
+        return TwoFactorChallengeController::completeLogin($request, $request->user(), $request->boolean('remember'));
     }
 
     /**

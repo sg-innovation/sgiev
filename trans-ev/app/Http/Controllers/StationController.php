@@ -84,6 +84,12 @@ class StationController extends Controller
             'cancellationPolicy' => ($cp = \App\Models\CancellationPolicy::activeFor($station)) ? \App\Http\Resources\BookingPresenter::policy($cp->snapshot()) : null,
             'rules' => $rules ? ['title' => $rules->title, 'version' => $rules->version, 'content' => PublicHtml::clean($rules->content)] : null,
             'mapStyle' => config('services.maps.style'),
+            'reviews' => (function () use ($station) {
+                $svc = app(\App\Services\ReviewService::class);
+
+                return ['avg' => $station->rating_count ? round((float) $station->rating_avg, 1) : null, 'count' => (int) $station->rating_count,
+                    'distribution' => $svc->distribution($station), 'items' => $svc->forStation($station)];
+            })(),
         ]);
     }
 }

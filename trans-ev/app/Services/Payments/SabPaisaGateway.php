@@ -21,6 +21,11 @@ class SabPaisaGateway implements PaymentGateway
 {
     public function __construct(private readonly Company $company) {}
 
+    public function name(): string
+    {
+        return 'sabpaisa';
+    }
+
     public function environment(): string
     {
         return $this->company->sabpaisa_env === 'production' ? 'production' : 'staging';
@@ -125,6 +130,8 @@ class SabPaisaGateway implements PaymentGateway
             'payment_mode' => $json['paymentMode'] ?? null,
             'bank_txn_id' => $json['bankTxnId'] ?? null,
             'bank_rrn' => $json['bankRrn'] ?? null,
+            // Masked payer instrument when SabPaisa returns one (card already masked by the gateway, or the payer VPA).
+            'instrument' => \App\Support\PaymentInstrument::fromAny($json['payerVpa'] ?? $json['vpa'] ?? $json['upiId'] ?? $json['maskedCardNumber'] ?? $json['cardNumber'] ?? null, $json['cardNetwork'] ?? $json['cardScheme'] ?? null),
             'raw' => $json,
         ];
     }

@@ -55,7 +55,7 @@ class UserResource extends Resource
     {
         $roles = Role::assignableByCompany();
 
-        return (auth()->user()?->hasRole(Role::SuperAdmin->value) ?? false) ? [Role::SuperAdmin->value => 'Platform super admin'] + $roles : $roles;
+        return (auth()->user()?->hasRole(Role::SuperAdmin->value) ?? false) ? [Role::SuperAdmin->value => 'Platform super admin', Role::RegionalManager->value => 'Regional manager (franchise)'] + $roles : $roles;
     }
 
     public static function form(Schema $schema): Schema

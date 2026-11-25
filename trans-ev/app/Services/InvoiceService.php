@@ -113,7 +113,7 @@ class InvoiceService
                     'slot' => $booking->start_at->setTimezone(Station::TIMEZONE)->format('d M Y, h:i A').' – '.$booking->end_at->setTimezone(Station::TIMEZONE)->format('h:i A'),
                     'vehicle' => $booking->vehicle_snapshot['registration_no'] ?? null,
                     'coupon' => $booking->coupon_code,
-                    'payment_mode' => $payment?->payment_mode, 'payment_ref' => $payment?->gateway_txn_id, 'rrn' => $payment?->bank_rrn,
+                    'payment_mode' => $payment?->methodLabel(), 'payment_ref' => $payment?->gateway_txn_id, 'rrn' => $payment?->bank_rrn,
                     'paid_at' => $payment?->paid_at?->setTimezone(Station::TIMEZONE)->format('d M Y, h:i A'),
                 ],
                 'lines' => $lines, 'sac_code' => $booking->sac_code,

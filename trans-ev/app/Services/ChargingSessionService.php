@@ -26,6 +26,9 @@ class ChargingSessionService
     /** Stations this staff member works at (platform admins: all; station managers: their assigned stations). */
     public static function stations(User $user): Builder
     {
+        if (FranchiseService::isRegionalOnly($user)) {
+            return Station::query()->whereIn('id', FranchiseService::stationIdsFor($user) ?: [0]);
+        }
         $q = Tenancy::scope(Station::query(), 'company_id', $user);
         if ($user->hasRole(Role::StationManager->value) && ! $user->hasAnyRole(Role::companyWide())) {
             $q->whereIn('id', $user->stations()->pluck('stations.id'));
@@ -82,6 +85,10 @@ class ChargingSessionService
             }
             $this->connectors->setLive($connector, ConnectorLiveStatus::Charging, 'staff', 'Session started: '.$booking->code, $by->id);
             activity()->performedOn($booking)->causedBy($by)->log('charging started');
+            if ($booking->charger?->ocpp_identity && $booking->charger->ocpp_connected) {
+                $session->forceFill(['id_tag' => $booking->code])->save();
+                app(\App\Services\Ocpp\OcppCommandService::class)->remoteStart($booking, $by);
+            }
 
             return $session;
         });
@@ -99,8 +106,23 @@ class ChargingSessionService
         if (! array_key_exists($reason, ChargingSession::STOP_REASONS)) {
             throw ValidationException::withMessages(['reason' => 'Choose why charging stopped.']);
         }
+        // OCPP chargers online: ask the charger to stop; the bill is made from its meter when it reports the stop.
+        if ($session->status === 'active' && $session->ocpp_transaction_id && $session->charger?->ocpp_connected && $meterStop === null && $energy === null) {
+            app(\App\Services\Ocpp\OcppCommandService::class)->remoteStop($session, $by);
 
-        $stopped = DB::transaction(function () use ($session, $by, $meterStop, $energy, $reason, $note) {
+            return $session->fresh();
+        }
+
+        return $this->complete($session, $by, $meterStop, $energy, $reason, $note);
+    }
+
+    /**
+     * Finish a session and bill it (staff stop, or the charger's StopTransaction via OCPP with $by = null).
+     * Walk-ins are billed from the energy; prepaid bookings get the final bill / true-up.
+     */
+    public function complete(ChargingSession $session, ?User $by, ?string $meterStop, ?string $energy, string $reason, ?string $note = null, string $via = 'staff'): ChargingSession
+    {
+        $stopped = DB::transaction(function () use ($session, $by, $meterStop, $energy, $reason, $note, $via) {
             /** @var ChargingSession $s */
             $s = ChargingSession::query()->whereKey($session->id)->lockForUpdate()->firstOrFail();
             if ($s->status !== 'active') {
@@ -123,13 +145,13 @@ class ChargingSessionService
             }
             $hours = max(1, $s->started_at->diffInMinutes(now(), true)) / 60;
             $max = (float) $s->charger->power_kw * $hours * 1.05 + 0.5;
-            if ((float) $kwh > $max) {
+            if ($via !== 'ocpp' && (float) $kwh > $max) {
                 throw ValidationException::withMessages([$source === 'meter' ? 'meter_stop' : 'energy' => sprintf('%.3f kWh is more than this %s kW charger can deliver in %d minutes. Check the reading.', $kwh, (float) $s->charger->power_kw, (int) round($hours * 60))]);
             }
 
             $s->forceFill([
                 'status' => 'completed', 'stopped_at' => now(), 'meter_stop_kwh' => $stopReading, 'energy_kwh' => $kwh, 'energy_source' => $source,
-                'stopped_by' => $by->id, 'stop_reason' => $reason, 'note' => $note ? mb_substr($note, 0, 255) : null,
+                'stopped_by' => $by?->id, 'stop_reason' => $reason, 'note' => $note ? mb_substr($note, 0, 255) : null,
             ])->save();
             if ($s->booking_id && ($walkIn = Booking::query()->whereKey($s->booking_id)->where('source', 'walk_in')->where('status', BookingStatus::CheckedIn)->first())) {
                 app(WalkInService::class)->bill($walkIn, $s);
@@ -140,11 +162,11 @@ class ChargingSessionService
             }
             $connector = Connector::query()->find($s->connector_id);
             if ($connector) {
-                $this->connectors->setLive($connector, $reason === 'fault' ? ConnectorLiveStatus::Faulted : ConnectorLiveStatus::Available, 'staff',
-                    'Session stopped: '.ChargingSession::STOP_REASONS[$reason], $by->id);
+                $this->connectors->setLive($connector, $reason === 'fault' ? ConnectorLiveStatus::Faulted : ConnectorLiveStatus::Available, $via,
+                    'Session stopped: '.ChargingSession::STOP_REASONS[$reason], $by?->id);
             }
 
-            $s->meterValues()->create(['measured_at' => now(), 'register_kwh' => $stopReading, 'energy_kwh' => $kwh, 'context' => 'stop', 'recorded_by' => $by->id]);
+            $s->meterValues()->create(['measured_at' => now(), 'register_kwh' => $stopReading, 'energy_kwh' => $kwh, 'context' => 'stop', 'recorded_by' => $by?->id, 'source' => $via === 'ocpp' ? 'ocpp' : 'manual']);
 
             return $s->fresh();
         });

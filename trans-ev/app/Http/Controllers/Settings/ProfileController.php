@@ -40,6 +40,22 @@ class ProfileController extends Controller
         return to_route('profile.edit');
     }
 
+    /** Upload a profile photo: re-encoded as a 256 px square JPEG (strips location and other metadata). */
+    public function photo(Request $request): RedirectResponse
+    {
+        $request->validate(['photo' => \App\Services\AvatarService::RULES]);
+        app(\App\Services\AvatarService::class)->store($request->user(), $request->file('photo'));
+
+        return back()->with('success', 'Profile photo updated.');
+    }
+
+    public function removePhoto(Request $request): RedirectResponse
+    {
+        app(\App\Services\AvatarService::class)->remove($request->user());
+
+        return back()->with('success', 'Profile photo removed.');
+    }
+
     /**
      * Delete the user's account.
      */

@@ -38,7 +38,7 @@ class PartnerSetup extends Widget
         $steps = [
             ['Company approved by Trans EV', $company->status === 'active', CompanyResource::getUrl('edit', ['record' => $company])],
             ['KYC documents uploaded', collect(CompanyDocument::required())->every(fn ($t) => isset($docs[$t]) && $docs[$t] !== 'rejected'), CompanyResource::getUrl('edit', ['record' => $company])],
-            ['SabPaisa payment account connected', $company->hasPaymentSetup(), CompanyResource::getUrl('edit', ['record' => $company])],
+            ['Payment gateway connected (SabPaisa or Razorpay)', $company->hasPaymentSetup(), CompanyResource::getUrl('edit', ['record' => $company])],
             ...(\App\Services\WalletService::usesWallet($company) ? [['Trans EV wallet recharged', (float) app(\App\Services\WalletService::class)->walletFor($company)->balance > 0, \App\Filament\Pages\WalletPage::getUrl()]] : []),
             ['First station added with chargers and prices', $stations->contains(fn (Station $s) => $s->chargers->isNotEmpty() && $s->tariffs->isNotEmpty()), StationResource::getUrl('index')],
             ['GSTIN set for every station’s state', $stations->isNotEmpty() && $stations->every(fn (Station $s) => (bool) $gst->invoiceGstin($s)), StationResource::getUrl('index')],

@@ -3,12 +3,13 @@
 namespace App\Services\Messaging;
 
 use App\Models\NotificationDelivery;
+use App\Services\Messaging\Providers\SgiConnects;
 use App\Support\Settings;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Http;
 
 /**
- * WhatsApp through Meta's Cloud API, using approved message templates. In Message templates the WhatsApp version's
+ * WhatsApp through the provider chosen in Settings → Integrations: SGI Connects or Meta's Cloud API directly, using approved message templates. In Message templates the WhatsApp version's
  * "Template name" is the approved Meta template; its body's {{variables}}, in order, fill the template's {{1}}, {{2}}…
  * Only customers who opted in to WhatsApp receive these.
  */
@@ -26,6 +27,20 @@ class WhatsAppChannel
         }
         if (! Channels::configured('whatsapp')) {
             NotificationDelivery::record($notifiable, $m['key'], 'whatsapp', 'simulated', ['recipient' => $to, 'provider' => 'log', 'preview' => $m['text']]);
+
+            return;
+        }
+        if (Channels::provider('whatsapp') === 'sgiconnects') {
+            try {
+                // Approved template when one is set; otherwise free text, which WhatsApp only delivers inside an open 24-hour window.
+                $r = filled($m['template_name'])
+                    ? SgiConnects::sendTemplate($to, $m['template_name'], $m['params'])
+                    : (SgiConnects::conversationOpen($to) ? SgiConnects::sendText($to, $m['text'])
+                        : ['ok' => false, 'id' => null, 'error' => 'No approved template name set and no open conversation with this customer']);
+                NotificationDelivery::record($notifiable, $m['key'], 'whatsapp', $r['ok'] ? 'sent' : 'failed', ['recipient' => $to, 'provider' => 'sgiconnects', 'id' => $r['id'], 'preview' => $m['text'], 'error' => $r['error']]);
+            } catch (\Throwable $e) {
+                NotificationDelivery::record($notifiable, $m['key'], 'whatsapp', 'failed', ['recipient' => $to, 'provider' => 'sgiconnects', 'preview' => $m['text'], 'error' => $e->getMessage()]);
+            }
 
             return;
         }

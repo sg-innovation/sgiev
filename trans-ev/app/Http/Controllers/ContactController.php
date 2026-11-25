@@ -40,11 +40,14 @@ class ContactController extends Controller
             'user_agent' => mb_substr((string) $request->userAgent(), 0, 255),
         ]);
 
-        if ($request->user() && ! $request->user()->isStaff()) {
+        // Every query becomes a threaded ticket: in the customer's account, or a guest ticket with a private link by email.
+        if (! $request->user()?->isStaff()) {
             try {
                 $ticket = app(\App\Services\TicketService::class)->fromContactMessage($msg);
 
-                return back()->with('success', "Thank you! We’ve opened support ticket {$ticket->number}. Follow it in My account → Support tickets.");
+                return back()->with('success', $ticket->isGuest()
+                    ? "Thank you! We’ve opened support ticket {$ticket->number} and emailed you a private link to follow it. You can also reply to that email."
+                    : "Thank you! We’ve opened support ticket {$ticket->number}. Follow it in My account → Support tickets.");
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Contact to ticket failed', ['ref' => $msg->reference, 'error' => $e->getMessage()]);
             }

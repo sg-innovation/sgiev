@@ -1,5 +1,6 @@
 import { StatusPill, directionsUrl, inr, stationState } from '@/components/site/station-bits';
 import CancellationPolicyCard, { type PolicyView } from '@/components/site/cancellation-policy';
+import { RatingBadge, StationReviewsSection, type StationReviews } from '@/components/site/reviews';
 import StationMap from '@/components/site/station-map';
 import SiteLayout from '@/layouts/site-layout';
 import { cn } from '@/lib/utils';
@@ -13,6 +14,7 @@ interface Props {
     rules: { title: string; version: number; content: string } | null;
     mapStyle: string;
     cancellationPolicy: PolicyView | null;
+    reviews?: StationReviews;
 }
 
 const todayIndex = new Date().getDay();
@@ -70,7 +72,7 @@ function Gallery({ photos, name }: { photos: string[]; name: string }) {
     );
 }
 
-export default function StationShow({ station, rules, mapStyle, cancellationPolicy = null }: Props) {
+export default function StationShow({ station, rules, mapStyle, cancellationPolicy = null, reviews }: Props) {
     const state = stationState(station);
 
     return (
@@ -88,6 +90,11 @@ export default function StationShow({ station, rules, mapStyle, cancellationPoli
                         <div>
                             <StatusPill state={state} className="bg-white/10 text-white ring-white/20" />
                             <h1 className="mt-3 font-display text-3xl font-bold sm:text-4xl">{station.name}</h1>
+                            {station.rating && (
+                                <a href="#reviews" className="mt-1 inline-flex text-white/90 hover:text-white">
+                                    <RatingBadge rating={station.rating} />
+                                </a>
+                            )}
                             {station.operator?.name && (
                                 <p className="mt-1 text-sm text-white/70">
                                     Operated by <span className="font-semibold text-white">{station.operator.name}</span>
@@ -257,6 +264,12 @@ export default function StationShow({ station, rules, mapStyle, cancellationPoli
                             <CalendarClock className="size-4" /> Choose a slot
                         </Link>
                     </section>
+
+                    {reviews && (
+                        <div id="reviews" className="scroll-mt-24">
+                            <StationReviewsSection reviews={reviews} />
+                        </div>
+                    )}
                 </div>
 
                 <aside className="space-y-6">

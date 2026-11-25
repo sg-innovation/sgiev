@@ -30,9 +30,9 @@ class TicketCategory extends Model
     }
 
     /** Categories a given user may pick when raising a ticket. */
-    public function scopeFor(Builder $query, User $user): Builder
+    public function scopeFor(Builder $query, ?User $user): Builder
     {
-        $audience = $user->hasAnyRole(\App\Enums\Role::staff()) ? 'partner' : 'customer';
+        $audience = $user?->hasAnyRole(\App\Enums\Role::staff()) ? 'partner' : 'customer';
 
         return $query->where('is_active', true)->whereIn('audience', ['all', $audience])->orderBy('sort')->orderBy('name');
     }

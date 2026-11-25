@@ -31,15 +31,33 @@ final class Settings
         'mail.ses_secret' => ['services.ses.secret', true],
         'mail.ses_region' => ['services.ses.region', false],
         'mail.resend_key' => ['services.resend.key', true],
-        // SMS / OTP (MSG91)
+        // SMS / OTP: provider choice, then MSG91 and SMS Birds
+        'sms.provider' => ['services.sms.provider', false],
+        'sms.smsbirds_url' => ['services.smsbirds.url', false],
+        'sms.smsbirds_username' => ['services.smsbirds.username', false],
+        'sms.smsbirds_api_key' => ['services.smsbirds.api_key', true],
+        'sms.smsbirds_sender' => ['services.smsbirds.sender', false],
+        'sms.smsbirds_route' => ['services.smsbirds.route', false],
         'sms.msg91_auth_key' => ['services.msg91.auth_key', true],
         'sms.msg91_sender_id' => ['services.msg91.sender_id', false],
         'sms.msg91_otp_template_id' => ['services.msg91.otp_template_id', false],
         'sms.msg91_booking_template_id' => ['services.msg91.booking_template_id', false],
-        // WhatsApp Cloud API
+        // WhatsApp: provider choice, then Meta Cloud API and SGI Connects
+        'whatsapp.provider' => ['services.whatsapp_provider', false],
+        'whatsapp.sgi_base_url' => ['services.sgiconnects.base_url', false],
+        'whatsapp.sgi_license' => ['services.sgiconnects.license', false],
+        'whatsapp.sgi_api_key' => ['services.sgiconnects.api_key', true],
         'whatsapp.access_token' => ['services.whatsapp.token', true],
         'whatsapp.phone_number_id' => ['services.whatsapp.phone_number_id', false],
         'whatsapp.business_account_id' => ['services.whatsapp.business_account_id', false],
+        // Support email: replies to ticket emails come back through the provider's inbound webhook
+        'support.inbound_address' => ['services.support_inbound.address', false],
+        'support.inbound_token' => ['services.support_inbound.token', true],
+        // Sign-in: a test number with a fixed code (no SMS), for app-store reviewers and developers
+        'auth.test_phone' => ['services.auth_test.phone', false],
+        'auth.test_otp' => ['services.auth_test.code', true],
+        // OCPP: the address chargers are configured with
+        'ocpp.public_url' => ['services.ocpp.public_url', false],
         // Push (Firebase)
         'push.fcm_project_id' => ['services.fcm.project_id', false],
         'push.fcm_service_account' => ['services.fcm.service_account', true],
@@ -50,6 +68,7 @@ final class Settings
         // Payments (platform defaults; each company keeps its own SabPaisa keys)
         'payments.sabpaisa_staging_url' => ['payments.sabpaisa.base_urls.staging', false],
         'payments.sabpaisa_production_url' => ['payments.sabpaisa.base_urls.production', false],
+        'payments.default_gateway' => ['payments.default_gateway', false],
     ];
 
     private const CACHE_KEY = 'system_settings.v1';

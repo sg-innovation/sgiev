@@ -34,6 +34,7 @@ class Booking extends Model
             'late_notice_at' => 'datetime',
             'late_eta_at' => 'datetime',
             'stop_requested_at' => 'datetime',
+            'review_requested_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'customer_snapshot' => 'array',
             'vehicle_snapshot' => 'array',
@@ -102,6 +103,11 @@ class Booking extends Model
     public function charger(): BelongsTo
     {
         return $this->belongsTo(Charger::class)->withTrashed();
+    }
+
+    public function review(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Review::class);
     }
 
     public function checkIn(): \Illuminate\Database\Eloquent\Relations\HasOne

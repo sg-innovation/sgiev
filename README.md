@@ -16,7 +16,13 @@ Trans EV (transevrecharge.com) is a multi-company EV charging marketplace. Drive
 - **Admin panel:** Filament 4 (`/admin`) with a custom theme
 - **Access control:** spatie/laravel-permission, with roles and permissions editable in the admin panel
 - **Audit:** spatie/laravel-activitylog (append-only)
-- **Payments:** SabPaisa (per-operator keys, encrypted). A built-in simulator is used in local development and tests.
+- **Payments:** each operator chooses SabPaisa or Razorpay (Payment Links) and enters its own keys (encrypted). A built-in simulator is used in local development and tests.
+- **Reports:** Admin → Reports → Business reports (revenue, sessions, kWh, GST, fees, gross-profit estimate; PDF and Excel) and Electricity costs.
+- **API & apps:** REST API `/api/v1` (Sanctum tokens) for the Android/iOS apps; developer portal at `/developers` (6-digit PIN from Admin → Settings → API developers) with full docs, live console, OpenAPI download and sandbox tokens.
+- **Sign-in security:** login with mobile OTP (website and API) and authenticator-app two-step login for everyone (required for staff in the admin panel).
+- **Maintenance & franchises:** charger work orders (Network → Maintenance) and franchise partners with regional managers and monthly commission payouts (Network → Franchises, public page `/franchise`).
+- **Support:** every contact-form query becomes a threaded ticket; guests follow it on a private signed link; replies by email land in the thread (Integrations → Support email).
+- **Messaging:** email (SMTP / SES / Resend), SMS through MSG91 or SMS Birds, WhatsApp through Meta Cloud API or SGI Connects, push through Firebase. The provider for each channel is chosen in Admin → Settings → Integrations & keys.
 - **GST documents:** barryvdh/laravel-dompdf
 - **Accounting:** SGI Accounting integration is planned.
 
@@ -87,6 +93,33 @@ Seeded demo users (password = `SEED_DEMO_PASSWORD` from `.env`):
 - `owner@greengrid.test` (a demo partner operator)
 
 In local development, payments go to the SabPaisa simulator, so no real money moves.
+
+### OCPP central system (chargers)
+
+Chargers with an OCPP identity talk to the built-in central system (OCPP **1.6J** and **2.0.1**):
+
+```bash
+php artisan ocpp:serve --port=9000          # WebSocket server: ws://<host>:9000/ocpp/<identity>
+php artisan ocpp:simulate CP-01 --password=… --tag=<booking code> --kwh=6 --seconds=30   # test without hardware
+```
+
+- Set each charger up in **Admin → Network → Charger control → OCPP setup** (identity, protocol, a new password shown once). Configure the charger with the server URL shown there.
+- `.env`: `OCPP_PORT` (default 9000), `OCPP_PUBLIC_URL` (e.g. `wss://ocpp.tranzactaev.com/ocpp`, also editable in Integrations → Chargers (OCPP)).
+- Production: run `php artisan ocpp:serve` under **Supervisor** (autorestart) and put **Nginx** in front for TLS:
+
+```nginx
+location /ocpp/ {
+    proxy_pass http://127.0.0.1:9000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Authorization $http_authorization;
+    proxy_set_header Sec-WebSocket-Protocol $http_sec_websocket_protocol;
+    proxy_read_timeout 3600s;
+}
+```
+
+- Restart the OCPP process after each deploy (`supervisorctl restart ocpp`), like queue workers.
 
 ### Scheduler
 

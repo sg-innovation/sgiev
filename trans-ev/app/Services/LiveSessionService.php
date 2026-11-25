@@ -91,13 +91,17 @@ class LiveSessionService
         if ($b->user_id !== $by->id) {
             throw ValidationException::withMessages(['stop' => 'This is not your booking.']);
         }
-        $active = ChargingSession::query()->where('booking_id', $b->id)->where('status', 'active')->exists();
+        $active = ChargingSession::query()->where('booking_id', $b->id)->where('status', 'active')->first();
         if (! $active) {
             throw ValidationException::withMessages(['stop' => 'Charging is not running.']);
         }
         if ($b->stop_requested_at === null) {
             $b->forceFill(['stop_requested_at' => now()])->save();
             activity()->performedOn($b)->causedBy($by)->log('customer asked to stop charging');
+        }
+        // OCPP charger online: stop it remotely right away (the final bill follows the charger's meter).
+        if ($active->ocpp_transaction_id && $active->charger?->ocpp_connected) {
+            app(\App\Services\Ocpp\OcppCommandService::class)->remoteStop($active, $by);
         }
     }
 }

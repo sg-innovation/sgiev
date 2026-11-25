@@ -66,7 +66,7 @@ class ActionCentre extends Widget
                 Tenancy::scope(Booking::query())->whereIn('status', $paid)->whereDoesntHave('invoice')
                     ->whereHas('payments', fn ($q) => $q->where('status', Payment::SUCCESS))->count(),
                 BookingResource::getUrl('index'), 'danger', 'heroicon-o-document-text');
-            $items[] = $this->item('Refunds in progress', 'Waiting for SabPaisa to confirm',
+            $items[] = $this->item('Refunds in progress', 'Waiting for the payment gateway to confirm',
                 Tenancy::scope(Refund::query())->where('status', Refund::INITIATED)->count(), PaymentResource::getUrl('index'), 'info', 'heroicon-o-arrow-uturn-left');
             $items[] = $this->item('Failed refunds', 'Need a manual refund by finance',
                 Tenancy::scope(Refund::query())->where('status', Refund::FAILED)->count(), PaymentResource::getUrl('index'), 'danger', 'heroicon-o-x-circle');
@@ -75,7 +75,7 @@ class ActionCentre extends Widget
         if (! $platform && $companyId) {
             $company = Company::find($companyId);
             if ($company && ! $company->hasPaymentSetup()) {
-                $items[] = $this->item('Payments not connected', 'Add your SabPaisa keys so customers can pay and book',
+                $items[] = $this->item('Payments not connected', 'Add your SabPaisa or Razorpay keys so customers can pay and book',
                     1, CompanyResource::getUrl('edit', ['record' => $company]), 'danger', 'heroicon-o-credit-card');
             }
             if ($company && \App\Services\WalletService::usesWallet($company)) {

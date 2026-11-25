@@ -27,6 +27,7 @@ Route::get('/blog/{slug}', [BlogController::class, 'show'])->where('slug', '[a-z
 // Payments (SabPaisa). The return URL is hit by the customer's browser; the webhook by SabPaisa's servers.
 Route::get('/payments/sabpaisa/return/{payment:uuid}', [PaymentController::class, 'return'])->middleware('throttle:30,1')->name('payments.return');
 Route::post('/webhooks/sabpaisa/{company:slug}', [PaymentController::class, 'webhook'])->middleware('throttle:600,1')->name('payments.webhook');
+Route::post('/webhooks/razorpay/{company:slug}', [PaymentController::class, 'razorpayWebhook'])->middleware('throttle:600,1')->name('payments.webhook.razorpay');
 
 if (config('payments.sabpaisa.simulate')) {
     Route::get('/dev/sabpaisa/checkout/{payment:uuid}', [PaymentController::class, 'simulatorCheckout'])->name('dev.sabpaisa.checkout');
@@ -57,6 +58,22 @@ Route::get('/p/{slug}', function (string $slug) {
 })->where('slug', '[a-z0-9-]+')->name('pages.custom');
 
 Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:5,1')->name('contact.store');
+Route::get('/developers', [\App\Http\Controllers\DeveloperPortalController::class, 'show'])->name('developers.show');
+Route::post('/developers/unlock', [\App\Http\Controllers\DeveloperPortalController::class, 'unlock'])->middleware('throttle:5,1')->name('developers.unlock');
+Route::post('/developers/logout', [\App\Http\Controllers\DeveloperPortalController::class, 'logout'])->name('developers.logout');
+Route::get('/developers/openapi.json', [\App\Http\Controllers\DeveloperPortalController::class, 'openApi'])->name('developers.openapi');
+Route::post('/developers/sandbox-token', [\App\Http\Controllers\DeveloperPortalController::class, 'sandboxToken'])->middleware('throttle:10,1')->name('developers.sandbox-token');
+Route::get('/franchise', [\App\Http\Controllers\FranchiseApplicationController::class, 'show'])->name('franchise.show');
+Route::post('/franchise', [\App\Http\Controllers\FranchiseApplicationController::class, 'store'])->middleware('throttle:3,10')->name('franchise.store');
+// Guest support tickets: signed private links from the guest's email (no account).
+Route::middleware('signed')->group(function () {
+    Route::get('/support/t/{ticket:uuid}', [\App\Http\Controllers\SupportGuestController::class, 'show'])->middleware('throttle:60,1')->name('support.guest.show');
+    Route::post('/support/t/{ticket:uuid}/reply', [\App\Http\Controllers\SupportGuestController::class, 'reply'])->middleware('throttle:10,10')->name('support.guest.reply');
+    Route::post('/support/t/{ticket:uuid}/status', [\App\Http\Controllers\SupportGuestController::class, 'status'])->middleware('throttle:10,10')->name('support.guest.status');
+    Route::get('/support/t/{ticket:uuid}/files/{message}/{index}', [\App\Http\Controllers\SupportGuestController::class, 'file'])->whereNumber(['message', 'index'])->middleware('throttle:60,1')->name('support.guest.file');
+});
+// Replies to ticket emails, posted by the mail provider's inbound webhook.
+Route::post('/webhooks/inbound-email/{token}', \App\Http\Controllers\InboundEmailController::class)->middleware('throttle:120,1')->name('support.inbound');
 
 Route::get('/{page}', function (string $page) {
     // Pages stored in the database (Admin → Content → Website pages) win over the built-in layouts.
@@ -85,6 +102,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/account/bookings', [BookingController::class, 'index'])->name('bookings.index');
     Route::get('/account/bookings/{booking:code}', [BookingController::class, 'show'])->name('bookings.show');
+    Route::post('/account/bookings/{booking:code}/review', [BookingController::class, 'review'])->middleware('throttle:10,1')->name('bookings.review');
     Route::get('/account/bookings/{booking:code}/live', [BookingController::class, 'live'])->middleware('throttle:120,1')->name('bookings.live');
     Route::post('/account/bookings/{booking:code}/stop-request', [BookingController::class, 'requestStop'])->middleware('throttle:10,1')->name('bookings.stop-request');
     Route::get('/account/bookings/{booking:code}/reschedule', [BookingController::class, 'rescheduleOptions'])->middleware('throttle:60,1')->name('bookings.reschedule-options');

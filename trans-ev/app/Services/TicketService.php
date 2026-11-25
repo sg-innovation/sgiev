@@ -74,8 +74,94 @@ class TicketService
         });
     }
 
+    /**
+     * Ticket for someone without an account (contact form). They are the requester by name and email, get an email
+     * with a private link to the thread, and can reply there or by replying to our emails.
+     *
+     * @param  list<UploadedFile>  $files
+     */
+    public function openForGuest(string $name, string $email, ?string $phone, TicketCategory $category, string $subject, string $body, ?Booking $booking = null, array $files = []): Ticket
+    {
+        if ($category->requires_booking && ! $booking) {
+            $category = TicketCategory::query()->for(null)->where('requires_booking', false)->firstOrFail();
+        }
+        $priority = $category->defaultPriority ?? TicketPriority::default();
+        $platformId = Company::query()->where('is_platform', true)->value('id');
+        $handler = $category->handled_by === 'operator' && $booking ? $booking->company_id : $platformId;
+        $email = strtolower(trim($email));
+
+        return DB::transaction(function () use ($name, $email, $phone, $category, $subject, $body, $booking, $files, $handler, $priority) {
+            $now = now();
+            $ticket = Ticket::create([
+                'company_id' => $handler, 'requester_id' => null, 'requester_company_id' => null,
+                'guest_name' => Str::limit(trim(strip_tags($name)), 120, ''), 'guest_email' => $email, 'guest_phone' => $phone,
+                'category_id' => $category->id, 'priority_id' => $priority->id, 'booking_id' => $booking?->id, 'station_id' => $booking?->station_id,
+                'subject' => Str::limit(trim(strip_tags($subject)), 160, ''), 'status' => 'open', 'channel' => 'contact',
+                'first_response_due_at' => $now->copy()->addMinutes($priority->first_response_minutes),
+                'resolution_due_at' => $now->copy()->addMinutes($priority->resolution_minutes),
+                'last_activity_at' => $now, 'last_reply_by' => 'requester',
+            ]);
+            $this->addMessage($ticket, null, $body, false, $files, 'guest', $ticket->guest_name, $email);
+            DB::afterCommit(function () use ($ticket) {
+                $t = $ticket->fresh();
+                $this->notifyRequester($t, 'ticket.received');
+                $this->notifyTeam($t, 'ticket.new');
+            });
+
+            return $ticket->fresh();
+        });
+    }
+
+    /**
+     * A guest requester's reply (from their private link or by email). Same effect as a customer reply: re-opens a
+     * resolved ticket and tells the assignee or the team.
+     *
+     * @param  list<UploadedFile>  $files
+     */
+    public function guestReply(Ticket $ticket, string $body, array $files = [], string $via = 'guest'): TicketMessage
+    {
+        abort_unless($ticket->isGuest(), 404);
+        if ($ticket->status === 'closed') {
+            throw ValidationException::withMessages(['body' => 'This ticket is closed. Please send us a new message.']);
+        }
+
+        return DB::transaction(function () use ($ticket, $body, $files, $via) {
+            $message = $this->addMessage($ticket, null, $body, false, $files, $via, $ticket->guest_name, $ticket->guest_email);
+            $changes = ['last_activity_at' => now(), 'last_reply_by' => 'requester',
+                'status' => in_array($ticket->status, ['resolved', 'waiting_on_customer'], true) ? 'open' : $ticket->status];
+            $this->applyStatusDates($ticket, $changes);
+            $ticket->forceFill($changes)->save();
+            DB::afterCommit(function () use ($ticket) {
+                $t = $ticket->fresh(['assignee']);
+                $t->assignee ? $t->assignee->notify(new TicketUpdate($t, 'ticket.requester_reply')) : $this->notifyTeam($t, 'ticket.requester_reply');
+            });
+
+            return $message;
+        });
+    }
+
+    /** A guest marks their ticket solved / closed (with an optional rating) or reopens a resolved one. */
+    public function guestStatus(Ticket $ticket, string $status, ?int $rating = null): void
+    {
+        abort_unless($ticket->isGuest(), 404);
+        $ok = in_array($status, ['resolved', 'closed'], true) ? $ticket->status !== 'closed' : ($status === 'open' && $ticket->status === 'resolved');
+        abort_unless($ok, 403);
+        DB::transaction(function () use ($ticket, $status, $rating) {
+            $changes = ['status' => $status, 'last_activity_at' => now()] + ($rating ? ['rating' => $rating] : []);
+            $this->applyStatusDates($ticket, $changes);
+            $ticket->forceFill($changes)->save();
+            $this->event($ticket, null, 'Status: '.Ticket::STATUSES[$status].' (by the requester)');
+        });
+    }
+
+    /** Email the requester (account holder through their channels, or the guest by email). */
+    public function notifyRequester(Ticket $ticket, string $template, array $vars = []): void
+    {
+        $ticket->requesterNotifiable()?->notify(new TicketUpdate($ticket, $template, $vars));
+    }
+
     /** Requester or agent reply. Agents may post internal notes and set the next status in one go. */
-    public function reply(Ticket $ticket, User $by, string $body, bool $internal = false, array $files = [], ?string $status = null): TicketMessage
+    public function reply(Ticket $ticket, User $by, string $body, bool $internal = false, array $files = [], ?string $status = null, string $via = 'web'): TicketMessage
     {
         $isRequester = $by->id === $ticket->requester_id;
         $isAgent = $this->canWork($by, $ticket);
@@ -85,8 +171,8 @@ class TicketService
         }
         $internal = $internal && $isAgent;
 
-        return DB::transaction(function () use ($ticket, $by, $body, $internal, $files, $status, $isAgent, $isRequester) {
-            $message = $this->addMessage($ticket, $by, $body, $internal, $files);
+        return DB::transaction(function () use ($ticket, $by, $body, $internal, $files, $status, $isAgent, $isRequester, $via) {
+            $message = $this->addMessage($ticket, $by, $body, $internal, $files, $via);
             $changes = ['last_activity_at' => now()];
             if (! $internal) {
                 if ($isAgent && ! $isRequester) {
@@ -104,13 +190,13 @@ class TicketService
             $this->applyStatusDates($ticket, $changes);
             $ticket->forceFill($changes)->save();
 
-            DB::afterCommit(function () use ($ticket, $by, $internal, $isAgent, $isRequester) {
+            DB::afterCommit(function () use ($ticket, $by, $internal, $isAgent, $isRequester, $body) {
                 $t = $ticket->fresh(['requester', 'assignee']);
                 if ($internal) {
                     return;
                 }
                 if ($isAgent && ! $isRequester) {
-                    $t->requester?->notify(new TicketUpdate($t, 'ticket.agent_reply'));
+                    $this->notifyRequester($t, 'ticket.agent_reply', ['message' => self::excerpt($body)]);
                 } elseif ($t->assignee && $t->assignee->id !== $by->id) {
                     $t->assignee->notify(new TicketUpdate($t, 'ticket.requester_reply'));
                 } else {
@@ -160,8 +246,7 @@ class TicketService
             $this->event($ticket, $by, 'Status: '.Ticket::STATUSES[$status]);
         });
         if ($by->id !== $ticket->requester_id && in_array($status, ['resolved', 'closed'], true)) {
-            $t = $ticket->fresh('requester');
-            $t->requester?->notify(new TicketUpdate($t, 'ticket.status'));
+            $this->notifyRequester($ticket->fresh('requester'), 'ticket.status');
         }
     }
 
@@ -218,21 +303,29 @@ class TicketService
     }
 
     /**
-     * Contact form → ticket. Signed-in users get a ticket straight away; for guests staff convert the message, which
-     * finds or creates the customer account (a set-password link is emailed).
+     * Contact form → ticket (every query becomes a threaded ticket). Signed-in customers get a ticket in their account;
+     * guests get a guest ticket with a private link by email. No account is created for them.
      */
     public function fromContactMessage(\App\Models\ContactMessage $msg, ?User $by = null): Ticket
     {
         if ($msg->ticket_id) {
             return Ticket::query()->findOrFail($msg->ticket_id);
         }
-        $user = $msg->user ?? User::query()->where('email', strtolower($msg->email))->first();
-        $created = false;
+        $user = $msg->user;
         if (! $user) {
-            $user = User::query()->create(['name' => $msg->name, 'email' => strtolower($msg->email), 'password' => \Illuminate\Support\Facades\Hash::make(Str::random(40))]);
-            $user->forceFill(['phone' => $msg->phone])->save();
-            $user->assignRole(\App\Enums\Role::Customer->value);
-            $created = true;
+            $category = TicketCategory::query()->for(null)->where('contact_topic', $msg->topic)->first()
+                ?? TicketCategory::query()->for(null)->where('requires_booking', false)->firstOrFail();
+            // A booking is linked only when the code matches a booking made with the same email address.
+            $booking = $msg->booking_code ? Booking::query()->where('code', $msg->booking_code)
+                ->where(fn ($q) => $q->whereRelation('user', 'email', strtolower($msg->email))->orWhere('customer_snapshot->email', strtolower($msg->email)))->first() : null;
+            $ticket = $this->openForGuest($msg->name, $msg->email, $msg->phone, $category, $msg->subject,
+                $msg->message.($msg->booking_code && ! $booking ? "\n\nBooking code given: {$msg->booking_code}" : ''), $booking);
+            $ticket->forceFill(['contact_message_id' => $msg->id])->save();
+            $msg->forceFill(['ticket_id' => $ticket->id, 'status' => 'resolved', 'resolved_at' => now(),
+                'internal_notes' => trim(($msg->internal_notes ?? '')."\nConverted to ticket {$ticket->number}".($by ? " by {$by->name}" : ''))])->save();
+            $this->event($ticket, $by, 'Created from contact form message '.$msg->reference);
+
+            return $ticket;
         }
         $category = TicketCategory::query()->for($user)->where('contact_topic', $msg->topic)->first()
             ?? TicketCategory::query()->for($user)->where('requires_booking', false)->orderBy('sort')->firstOrFail();
@@ -245,9 +338,6 @@ class TicketService
         $msg->forceFill(['ticket_id' => $ticket->id, 'status' => 'resolved', 'resolved_at' => now(),
             'internal_notes' => trim(($msg->internal_notes ?? '')."\nConverted to ticket {$ticket->number}".($by ? " by {$by->name}" : ''))])->save();
         $this->event($ticket, $by, 'Created from contact form message '.$msg->reference);
-        if ($created) {
-            \Illuminate\Support\Facades\Password::broker()->sendResetLink(['email' => $user->email]);
-        }
 
         return $ticket;
     }
@@ -284,7 +374,7 @@ class TicketService
     }
 
     /** @param  list<UploadedFile>  $files */
-    private function addMessage(Ticket $ticket, ?User $by, string $body, bool $internal, array $files): TicketMessage
+    private function addMessage(Ticket $ticket, ?User $by, string $body, bool $internal, array $files, string $via = 'web', ?string $authorName = null, ?string $authorEmail = null): TicketMessage
     {
         $stored = [];
         foreach (array_slice(array_filter($files), 0, self::maxFiles()) as $file) {
@@ -302,6 +392,7 @@ class TicketService
         return TicketMessage::create([
             'ticket_id' => $ticket->id, 'user_id' => $by?->id, 'body' => trim(Str::limit($body, 10000, '')),
             'is_internal' => $internal, 'attachments' => $stored ?: null,
+            'via' => $via, 'author_name' => $authorName, 'author_email' => $authorEmail,
         ]);
     }
 
@@ -349,6 +440,12 @@ class TicketService
     {
         User::query()->whereNull('blocked_at')->permission('tickets.assign')->where('company_id', $ticket->company_id)->limit(10)->get()
             ->each(fn (User $u) => $u->notify(new TicketUpdate($ticket, $template)));
+    }
+
+    /** First part of a message for notification emails (plain text, never internal notes). */
+    public static function excerpt(string $body, int $limit = 1200): string
+    {
+        return Str::limit(trim(preg_replace("/\n{3,}/", "\n\n", strip_tags($body))), $limit);
     }
 
     public static function attachmentStream(array $file): \Symfony\Component\HttpFoundation\StreamedResponse

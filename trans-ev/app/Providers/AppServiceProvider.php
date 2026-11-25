@@ -22,6 +22,13 @@ class AppServiceProvider extends ServiceProvider
         // Admin-managed integration settings (encrypted) override .env values.
         \App\Support\Settings::applyToConfig();
 
+        // API rate limits: per token user (or IP when signed out); sign-in endpoints are tighter per IP.
+        \Illuminate\Support\Facades\RateLimiter::for('api', fn (\Illuminate\Http\Request $r) => \Illuminate\Cache\RateLimiting\Limit::perMinute(120)->by($r->user()?->id ?: $r->ip()));
+        \Illuminate\Support\Facades\RateLimiter::for('otp', fn (\Illuminate\Http\Request $r) => [
+            \Illuminate\Cache\RateLimiting\Limit::perMinute(6)->by('otp-ip:'.$r->ip()),
+            \Illuminate\Cache\RateLimiting\Limit::perHour(30)->by('otp-ip-h:'.$r->ip()),
+        ]);
+
         // D1: log every email notification in the delivery log (SMS / WhatsApp / push channels log themselves).
         \Illuminate\Support\Facades\Event::listen(\Illuminate\Notifications\Events\NotificationSent::class, function ($e) {
             if ($e->channel === 'mail') {

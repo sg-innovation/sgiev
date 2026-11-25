@@ -130,6 +130,20 @@ final class BookingPresenter
                 'from' => $r->from_start->timezone(Station::TIMEZONE)->format('D j M, g:i A').' · '.$r->fromCharger?->code,
                 'to' => $r->to_start->timezone(Station::TIMEZONE)->format('D j M, g:i A').' · '.$r->toCharger?->code, 'reason' => $r->reason,
             ])->values(),
+            'review' => (function () use ($b) {
+                $svc = app(\App\Services\ReviewService::class);
+                $r = $b->review()->first();
+                $why = $svc->blocker($b, auth()->user());
+                if (! $r && $why) {
+                    return null;
+                }
+
+                return [
+                    'canEdit' => $why === null, 'tagOptions' => collect(\App\Services\ReviewService::tags())->map(fn ($l, $v) => ['value' => $v, 'label' => $l])->values(),
+                    'existing' => $r ? ['stationRating' => $r->station_rating, 'chargerRating' => $r->charger_rating, 'tags' => $r->tags ?? [], 'body' => $r->body,
+                        'status' => $r->status, 'statusLabel' => \App\Models\Review::STATUSES[$r->status] ?? $r->status, 'reply' => $r->owner_reply] : null,
+                ];
+            })(),
             'canCancel' => $b->canBeCancelledByCustomer(),
             'canPay' => $b->isHoldActive(),
             'cancellationPolicy' => self::policy(\App\Services\Payments\RefundService::policyOf($b)),
@@ -137,7 +151,7 @@ final class BookingPresenter
             'payment' => ($p = $b->payments()->where('purpose', 'booking')->whereIn('status', ['success', 'pending'])->first()) ? [
                 'status' => $p->status,
                 'amount' => (float) ($p->paid_amount ?? $p->amount),
-                'mode' => $p->payment_mode,
+                'mode' => $p->methodLabel(),
                 'gatewayTxnId' => $p->gateway_txn_id,
                 'paidAt' => $p->paid_at?->setTimezone(Station::TIMEZONE)->format('j M Y, g:i A'),
                 'simulated' => $p->environment === 'simulator',

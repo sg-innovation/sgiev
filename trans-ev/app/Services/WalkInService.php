@@ -65,11 +65,19 @@ class WalkInService
     /**
      * @param  array{registration_no: string, make?: ?string, model?: ?string, name: string, phone: string, email?: ?string, gstin?: ?string, minutes: int, meter_start?: ?string}  $d
      */
+    private static function requireFeature(\App\Models\Station $station): void
+    {
+        if (! ($station->company?->hasFeature('walk_in') ?? false)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['connector_id' => 'Walk-ins are not included in this operator’s plan.']);
+        }
+    }
+
     public function start(Connector $connector, array $d, User $by): Booking
     {
         $connector->loadMissing('charger.station.company');
         $charger = $connector->charger;
         $station = $charger->station;
+        self::requireFeature($station);
         if (! self::canManage($by, $station->id) || ! $by->can('sessions.manage')) {
             throw ValidationException::withMessages(['connector_id' => 'You can’t start walk-ins at this station.']);
         }

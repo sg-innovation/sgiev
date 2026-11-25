@@ -100,7 +100,7 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
             </div>
 
             {open && (
-                <nav className="border-t border-border/60 bg-background px-4 pb-6 md:hidden">
+                <nav className="max-h-[calc(100svh-4rem)] overflow-y-auto border-t border-border/60 bg-background px-4 pb-6 text-foreground shadow-lg md:hidden [&_a]:text-foreground" aria-label="Menu">
                     {NAV.map((item) => (
                         <Link key={item.href} href={item.href} className="block border-b border-border/40 py-3 text-base font-medium" onClick={() => setOpen(false)}>
                             {item.label}
@@ -144,6 +144,7 @@ export function SiteFooter() {
                         <li><Link href="/safety" className="hover:text-volt">Charging safety</Link></li>
                         <li><Link href="/blog" className="hover:text-volt">Blog</Link></li>
                         <li><Link href="/partner" className="hover:text-volt">List your station</Link></li>
+                        <li><Link href="/franchise" className="hover:text-volt">Become a franchise partner</Link></li>
                         <li><Link href={route('register')} className="hover:text-volt">Create account</Link></li>
                     </ul>
                 </div>
@@ -186,7 +187,7 @@ export function SiteFooter() {
 
 export default function SiteLayout({ children, transparentHeader = false, hideFooter = false }: { children: ReactNode; transparentHeader?: boolean; hideFooter?: boolean }) {
     return (
-        <div className="flex min-h-screen flex-col bg-background text-foreground">
+        <div className="flex min-h-screen flex-col overflow-x-clip bg-background text-foreground">
             <SiteHeader transparent={transparentHeader} />
             <main className={cn('flex-1', !transparentHeader && 'pt-16')}>{children}</main>
             {!hideFooter && <SiteFooter />}

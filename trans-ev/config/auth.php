@@ -110,6 +110,9 @@ return [
     |
     */
 
+    // Staff two-step login in the admin panel (Business rules can switch it off). Tests turn the enforcement off.
+    'staff_2fa_enforced' => (bool) env('STAFF_2FA_ENFORCED', true),
+
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
 ];

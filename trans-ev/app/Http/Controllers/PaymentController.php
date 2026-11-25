@@ -73,6 +73,14 @@ class PaymentController extends Controller
         return response($ok ? 'OK' : 'Invalid signature', $ok ? 200 : 401);
     }
 
+    /** Razorpay webhook (one URL per operator, set in the Razorpay dashboard with the webhook secret). */
+    public function razorpayWebhook(Request $request, Company $company): Response
+    {
+        $ok = $this->payments->handleWebhook($company, $request->getContent(), $request->header('X-Razorpay-Signature'), $request->ip(), 'razorpay', $request->header('X-Razorpay-Event-Id'));
+
+        return response($ok ? 'OK' : 'Invalid signature', $ok ? 200 : 401);
+    }
+
     /** Customer asks to re-check a pending payment. */
     public function refresh(Request $request, Booking $booking): RedirectResponse
     {
@@ -117,7 +125,7 @@ class PaymentController extends Controller
                 'booking' => \App\Http\Resources\BookingPresenter::detail($booking),
                 'payment' => [
                     'amount' => (float) ($payment->paid_amount ?? $payment->amount),
-                    'mode' => $payment->payment_mode,
+                    'mode' => $payment->methodLabel(),
                     'gatewayTxnId' => $payment->gateway_txn_id,
                     'bankTxnId' => $payment->bank_txn_id,
                     'merchantTxnId' => $payment->merchant_txn_id,

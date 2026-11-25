@@ -21,11 +21,12 @@ class Company extends Model
         'invoice_prefix', 'bank_details', 'social_links', 'invoice_terms',
         'commission_percent', 'per_booking_fee', 'fee_terms_note', 'billing_mode',
         'sabpaisa_env', 'sabpaisa_merchant_id', 'sabpaisa_api_key', 'sabpaisa_secret_key', 'sabpaisa_webhook_secret',
+        'payment_gateway', 'razorpay_key_id', 'razorpay_key_secret', 'razorpay_webhook_secret',
     ];
 
     // is_platform, status and onboarded_at change only through explicit platform actions.
 
-    protected $hidden = ['sabpaisa_api_key', 'sabpaisa_secret_key', 'sabpaisa_webhook_secret'];
+    protected $hidden = ['sabpaisa_api_key', 'sabpaisa_secret_key', 'sabpaisa_webhook_secret', 'razorpay_key_secret', 'razorpay_webhook_secret'];
 
     public const STATUSES = [
         'pending' => 'Awaiting review',
@@ -48,6 +49,8 @@ class Company extends Model
             'sabpaisa_api_key' => 'encrypted',
             'sabpaisa_secret_key' => 'encrypted',
             'sabpaisa_webhook_secret' => 'encrypted',
+            'razorpay_key_secret' => 'encrypted',
+            'razorpay_webhook_secret' => 'encrypted',
         ];
     }
 
@@ -55,6 +58,7 @@ class Company extends Model
     {
         static::creating(function (Company $c) {
             $c->slug ??= Str::slug($c->trade_name).'-'.Str::lower(Str::random(4));
+            $c->payment_gateway ??= in_array($d = \App\Support\Settings::get('payments.default_gateway'), ['sabpaisa', 'razorpay'], true) ? $d : 'sabpaisa';
         });
         static::saving(function (Company $c) {
             // Record when the commission terms were (re)agreed.
@@ -150,7 +154,9 @@ class Company extends Model
 
     public function hasPaymentSetup(): bool
     {
-        return filled($this->sabpaisa_merchant_id) && filled($this->sabpaisa_api_key) && filled($this->sabpaisa_secret_key);
+        return ($this->payment_gateway ?: 'sabpaisa') === 'razorpay'
+            ? filled($this->razorpay_key_id) && filled($this->razorpay_key_secret)
+            : filled($this->sabpaisa_merchant_id) && filled($this->sabpaisa_api_key) && filled($this->sabpaisa_secret_key);
     }
 
     /** The platform operator (owner of transevrecharge.com): supplies site contact details and the blog. */
@@ -162,7 +168,7 @@ class Company extends Model
     public function getActivitylogOptions(): LogOptions
     {
         // Never write payment secrets into the audit log.
-        return LogOptions::defaults()->logFillable()->logOnly(['status', 'plan_id', 'is_platform', 'review_note'])->logExcept(['sabpaisa_api_key', 'sabpaisa_secret_key', 'sabpaisa_webhook_secret'])
+        return LogOptions::defaults()->logFillable()->logOnly(['status', 'plan_id', 'is_platform', 'review_note'])->logExcept(['sabpaisa_api_key', 'sabpaisa_secret_key', 'sabpaisa_webhook_secret', 'razorpay_key_secret', 'razorpay_webhook_secret'])
             ->logOnlyDirty()->dontLogEmptyChanges();
     }
 }

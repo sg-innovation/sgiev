@@ -30,6 +30,11 @@ class LookupSeeder extends Seeder
                 ['station', 'Station issue or fault', null], ['fleet', 'Fleet / business charging', null],
                 ['partner', 'Host a charger / partnership', null], ['feedback', 'Feedback or suggestion', null], ['other', 'Something else', null],
             ],
+            'review_tag' => [
+                ['fast_charging', 'Fast charging', null], ['easy_to_find', 'Easy to find', null], ['clean', 'Clean and tidy', null],
+                ['helpful_staff', 'Helpful staff', null], ['safe', 'Felt safe', null], ['good_amenities', 'Good amenities', null],
+                ['slow_charging', 'Slower than expected', null], ['charger_issue', 'Charger problem', null], ['long_wait', 'Had to wait', null],
+            ],
             'ev_model' => [
                 ['tata-nexon-ev', 'Tata Nexon EV', ['make' => 'Tata', 'model' => 'Nexon EV', 'battery_kwh' => 40.5, 'connector' => 'ccs2']],
                 ['tata-punch-ev', 'Tata Punch EV', ['make' => 'Tata', 'model' => 'Punch EV', 'battery_kwh' => 35, 'connector' => 'ccs2']],

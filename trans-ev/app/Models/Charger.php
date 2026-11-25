@@ -17,7 +17,7 @@ class Charger extends Model
     use LogsActivity, SoftDeletes;
 
     // status / status_reason change only through StationStatusService.
-    protected $hidden = ['qr_key'];
+    protected $hidden = ['qr_key', 'ocpp_password'];
 
     protected $fillable = ['station_id', 'code', 'name', 'oem', 'model', 'serial_no', 'ocpp_identity', 'ocpp_protocol', 'type', 'power_kw', 'connectors',
         'input_voltage_v', 'phases', 'output_voltage_min_v', 'output_voltage_max_v', 'max_current_a', 'standard',
@@ -50,6 +50,7 @@ class Charger extends Model
             'connectors' => 'array',
             'power_kw' => 'decimal:2',
             'last_heartbeat_at' => 'datetime',
+            'ocpp_connected' => 'boolean', 'ocpp_connected_at' => 'datetime', 'ocpp_disconnected_at' => 'datetime', 'ocpp_boot_at' => 'datetime',
         ];
     }
 
@@ -88,7 +89,7 @@ class Charger extends Model
             return 'manual';
         }
 
-        return $this->last_heartbeat_at?->gt(now()->subMinutes(10)) ? 'connected' : 'disconnected';
+        return $this->ocpp_connected ? 'connected' : 'disconnected';
     }
 
     public function station(): BelongsTo
@@ -104,5 +105,25 @@ class Charger extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()->logFillable()->logOnlyDirty()->dontLogEmptyChanges();
+    }
+
+    public function ocppCommands(): HasMany
+    {
+        return $this->hasMany(OcppCommand::class);
+    }
+
+    public function ocppMessages(): HasMany
+    {
+        return $this->hasMany(OcppMessage::class);
+    }
+
+    public function ocppFaults(): HasMany
+    {
+        return $this->hasMany(OcppFault::class);
+    }
+
+    public function workOrders(): HasMany
+    {
+        return $this->hasMany(ChargerWorkOrder::class);
     }
 }

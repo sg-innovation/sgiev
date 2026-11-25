@@ -32,6 +32,7 @@ export interface StationCard {
     connectors: Option[];
     fromRate: number | null;
     amenities: string[];
+    rating: { avg: number; count: number } | null;
 }
 
 export interface StationTariff {

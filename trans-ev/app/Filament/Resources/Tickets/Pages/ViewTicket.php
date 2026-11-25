@@ -60,8 +60,9 @@ class ViewTicket extends Page
             'agent' => $agent,
             'messages' => $t->messages->filter(fn (TicketMessage $m) => $agent || ! $m->is_internal)->map(fn (TicketMessage $m) => [
                 'id' => $m->id,
-                'author' => $m->user?->name ?? 'System',
-                'fromRequester' => $m->user_id === $t->requester_id,
+                'author' => $m->user?->name ?? $m->author_name ?? ($m->event ? 'System' : $t->requesterName()),
+                'fromRequester' => $t->isFromRequester($m),
+                'viaEmail' => $m->via === 'email',
                 'internal' => $m->is_internal,
                 'event' => $m->event === 'system',
                 'body' => $m->body,
@@ -88,6 +89,16 @@ class ViewTicket extends Page
                 ->action(function (array $data) {
                     $this->service()->reply($this->record, auth()->user(), $data['body'], (bool) ($data['internal'] ?? false), array_values($data['files'] ?? []), $data['status'] ?? null);
                     Notification::make()->success()->title(($data['internal'] ?? false) ? 'Note added' : 'Reply sent')->send();
+                }),
+            Action::make('newLink')->label('Email a new private link')->icon('heroicon-m-link')->color('gray')
+                ->visible(fn () => $this->record->isGuest() && $this->isAgent())
+                ->requiresConfirmation()
+                ->modalDescription(fn () => 'The guest ('.$this->record->guest_email.') gets a fresh link to this ticket by email. Links sent before stop working.')
+                ->action(function () {
+                    $this->record->forceFill(['guest_link_version' => ($this->record->guest_link_version ?? 1) + 1])->save();
+                    $this->service()->notifyRequester($this->record->fresh(), 'ticket.received');
+                    activity()->performedOn($this->record)->causedBy(auth()->user())->log('guest ticket link reissued');
+                    Notification::make()->success()->title('New link emailed to '.$this->record->guest_email)->send();
                 }),
             Action::make('assign')->label(fn () => $this->record->assigned_to ? 'Reassign' : 'Assign')->icon('heroicon-m-user-plus')->color('gray')
                 ->visible(fn () => auth()->user()->can('tickets.assign') && \App\Support\Tenancy::owns($this->record->company_id))

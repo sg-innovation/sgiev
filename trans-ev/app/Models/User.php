@@ -15,22 +15,25 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable implements FilamentUser, MustVerifyEmail
+class User extends Authenticatable implements FilamentUser, MustVerifyEmail, \Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication, \Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, HasRoles, Notifiable;
+    use HasFactory, HasRoles, Notifiable, \Laravel\Sanctum\HasApiTokens;
 
     protected $fillable = [
         'company_id',
         'name',
         'email',
         'phone',
+        'city',
         'gstin',
         'state_code',
         'password',
     ];
 
     protected $hidden = [
+        'two_factor_secret',
+        'two_factor_recovery_codes',
         'password',
         'remember_token',
     ];
@@ -39,6 +42,10 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     {
         return [
             'notification_prefs' => 'array',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_recovery_codes' => 'encrypted:array',
+            'two_factor_confirmed_at' => 'datetime',
+            'phone_verified_at' => 'datetime',
             'email_verified_at' => 'datetime',
             'blocked_at' => 'datetime',
             'last_login_at' => 'datetime',
@@ -88,5 +95,38 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     public function isStaff(): bool
     {
         return $this->hasAnyRole(Role::staff());
+    }
+
+    /** Public URL of the profile photo (null when none). */
+    public function avatarUrl(): ?string
+    {
+        return $this->avatar_path ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->avatar_path) : null;
+    }
+
+    // Authenticator-app two-step login: the same secret is used by the website, the API and the admin panel (Filament).
+
+    public function getAppAuthenticationSecret(): ?string
+    {
+        return $this->two_factor_secret;
+    }
+
+    public function saveAppAuthenticationSecret(#[\SensitiveParameter] ?string $secret): void
+    {
+        $this->forceFill(['two_factor_secret' => $secret, 'two_factor_confirmed_at' => $secret ? now() : null])->save();
+    }
+
+    public function getAppAuthenticationHolderName(): string
+    {
+        return $this->email;
+    }
+
+    public function getAppAuthenticationRecoveryCodes(): ?array
+    {
+        return $this->two_factor_recovery_codes;
+    }
+
+    public function saveAppAuthenticationRecoveryCodes(#[\SensitiveParameter] ?array $codes): void
+    {
+        $this->forceFill(['two_factor_recovery_codes' => $codes])->save();
     }
 }

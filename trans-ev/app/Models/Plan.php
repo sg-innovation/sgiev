@@ -23,15 +23,19 @@ class Plan extends Model
         'booking_notifications' => 'Booking notifications',
         'advanced_analytics' => 'Advanced analytics',
         'multi_branch' => 'Multiple branch management',
-        'franchise' => 'Franchise management',
-        'crm' => 'Advanced CRM',
-        'white_label' => 'White-label app',
-        'advanced_reports' => 'Advanced business reports (PDF/Excel)',
-        'accounting_sync' => 'Automated accounting (SGI Accounting)',
+        'franchise' => 'Join Trans EV franchises (stations in a franchise)',
+        'crm' => 'Advanced CRM (coming soon)',
+        'white_label' => 'White-label app (coming soon)',
+        'advanced_reports' => 'Advanced business reports (PDF/Excel, GST, charger-wise, electricity cost & profit)',
+        'accounting_sync' => 'Automated accounting – SGI Accounting (coming soon)',
         'coupons' => 'Coupons & discounts',
+        'maintenance' => 'Charger maintenance & work orders',
+        'waitlist' => 'Waiting list',
+        'reviews' => 'Ratings & reviews (reply to customers)',
+        'ocpp' => 'OCPP charger integration & remote control',
     ];
 
-    public const FREE_FEATURES = ['stations', 'chargers', 'live_dashboard', 'online_booking', 'walk_in', 'basic_reports', 'booking_notifications'];
+    public const FREE_FEATURES = ['stations', 'chargers', 'live_dashboard', 'online_booking', 'walk_in', 'basic_reports', 'booking_notifications', 'maintenance', 'waitlist', 'reviews'];
 
     protected $fillable = ['name', 'slug', 'description', 'price_monthly', 'commission_percent', 'per_booking_fee', 'features', 'max_stations', 'is_default', 'is_active', 'sort'];
 

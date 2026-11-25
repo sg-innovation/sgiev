@@ -125,9 +125,12 @@ class CustomerResource extends Resource
         return $table
             ->defaultSort('created_at', 'desc')
             ->columns([
+                \Filament\Tables\Columns\ImageColumn::make('avatar')->label('')->circular()->imageSize(32)
+                    ->state(fn (User $record) => $record->avatarUrl()),
                 TextColumn::make('name')->searchable()->sortable()->weight('medium')
                     ->description(fn (User $record) => $record->email),
                 TextColumn::make('phone')->searchable()->placeholder('—')->copyable(),
+                TextColumn::make('city')->searchable()->placeholder('—')->toggleable(),
                 TextColumn::make('vehicles_count')->label('Vehicles')->alignCenter()->sortable(),
                 TextColumn::make('bookings_count')->label('Paid bookings')->alignCenter()->sortable(),
                 TextColumn::make('spent')->label('Spent')->money('INR')->sortable()->placeholder('₹0.00'),
@@ -191,6 +194,7 @@ class CustomerResource extends Resource
                     TextEntry::make('name')->weight('semibold'),
                     TextEntry::make('email')->copyable(),
                     TextEntry::make('phone')->placeholder('—')->copyable(),
+                    TextEntry::make('city')->placeholder('—'),
                     TextEntry::make('state_code')->label('State')->formatStateUsing(fn (?string $state) => $state ? IndianStates::name($state) : null)->placeholder('—'),
                     TextEntry::make('gstin')->label('GSTIN (B2B invoices)')->placeholder('—'),
                     IconEntry::make('verified')->label('Email verified')->boolean()->state(fn (User $record) => $record->email_verified_at !== null),

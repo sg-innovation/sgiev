@@ -102,7 +102,7 @@ class ConnectorResource extends Resource
                         TextInput::make('note')->maxLength(255)->placeholder('e.g. cable damaged, technician called'),
                     ])
                     ->action(function (Connector $record, array $data) {
-                        app(ConnectorStatusService::class)->setLive($record, ConnectorLiveStatus::from($data['status']), 'admin', $data['note'] ?? null);
+                        app(ConnectorStatusService::class)->setLive($record, ($data['status'] instanceof ConnectorLiveStatus ? $data['status'] : ConnectorLiveStatus::from($data['status'])), 'admin', $data['note'] ?? null);
                         Notification::make()->success()->title('Live status updated')->send();
                     }),
                 Action::make('availability')->label('Availability')->icon('heroicon-m-power')->color('gray')
@@ -113,7 +113,7 @@ class ConnectorResource extends Resource
                         TextInput::make('note')->label('Reason')->maxLength(255),
                     ])
                     ->action(function (Connector $record, array $data) {
-                        app(ConnectorStatusService::class)->setAdmin($record, StationStatus::from($data['status']), $data['note'] ?? null);
+                        app(ConnectorStatusService::class)->setAdmin($record, ($data['status'] instanceof StationStatus ? $data['status'] : StationStatus::from($data['status'])), $data['note'] ?? null);
                         Notification::make()->success()->title('Availability updated')->send();
                     }),
             ]);

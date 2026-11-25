@@ -240,6 +240,20 @@ class BookingController extends Controller
         return Inertia::render('booking/show', ['booking' => BookingPresenter::detail($booking)]);
     }
 
+    /** D3: rate the station and charger after a completed booking. */
+    public function review(Request $request, Booking $booking): RedirectResponse
+    {
+        $d = $request->validate([
+            'station_rating' => ['required', 'integer', 'between:1,5'], 'charger_rating' => ['nullable', 'integer', 'between:1,5'],
+            'tags' => ['nullable', 'array', 'max:6'], 'tags.*' => ['string', 'max:40'], 'body' => ['nullable', 'string', 'max:1000'],
+        ]);
+        $r = app(\App\Services\ReviewService::class)->submit($booking, $request->user(), $d);
+
+        return to_route('bookings.show', $booking)->with('success', $r->status === 'pending'
+            ? 'Thanks for your review! It will appear on the station page once it has been checked.'
+            : 'Thanks for rating your charge!');
+    }
+
     /** C9: live charging data for the customer's tracking card (polled). */
     public function live(Request $request, Booking $booking): JsonResponse
     {

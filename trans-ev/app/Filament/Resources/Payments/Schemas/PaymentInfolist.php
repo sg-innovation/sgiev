@@ -25,7 +25,7 @@ class PaymentInfolist
                 TextEntry::make('amount')->money('INR'),
                 TextEntry::make('paid_amount')->money('INR')->placeholder('—'),
                 TextEntry::make('payment_mode')->label('Mode')->placeholder('—'),
-                TextEntry::make('gateway_txn_id')->label('SabPaisa transaction')->copyable()->placeholder('—'),
+                TextEntry::make('gateway_txn_id')->label('Gateway transaction / UTR')->copyable()->placeholder('—'),
                 TextEntry::make('bank_txn_id')->label('Bank reference')->placeholder('—'),
                 TextEntry::make('bank_rrn')->label('RRN')->placeholder('—'),
                 TextEntry::make('created_at')->label('Started')->dateTime('d M Y, h:i:s A', $tz),

@@ -58,6 +58,7 @@ class PaymentService
                 'company_id' => $company->id,
                 'booking_id' => $booking->id,
                 'user_id' => $booking->user_id,
+                'gateway' => $gateway->name(),
                 'environment' => $gateway->environment(),
                 'merchant_txn_id' => 'TEVP'.now()->format('ymdHis').Str::upper(Str::random(6)),
                 'amount' => $booking->total_amount,
@@ -118,7 +119,7 @@ class PaymentService
         return DB::transaction(function () use ($booking, $company, $gateway) {
             $payment = Payment::create([
                 'company_id' => $company->id, 'booking_id' => $booking->id, 'user_id' => $booking->user_id, 'purpose' => $booking->source === 'walk_in' ? 'booking' : 'balance',
-                'environment' => $gateway->environment(), 'merchant_txn_id' => 'TEVW'.now()->format('ymdHis').Str::upper(Str::random(6)),
+                'gateway' => $gateway->name(), 'environment' => $gateway->environment(), 'merchant_txn_id' => 'TEVW'.now()->format('ymdHis').Str::upper(Str::random(6)),
                 'amount' => \App\Services\WalkInService::amountDue($booking), 'status' => Payment::CREATED,
             ]);
             try {
@@ -158,7 +159,7 @@ class PaymentService
         return DB::transaction(function () use ($operator, $amount, $by, $platform, $gateway) {
             $payment = Payment::create([
                 'company_id' => $platform->id, 'booking_id' => null, 'purpose' => 'wallet', 'payer_company_id' => $operator->id,
-                'user_id' => $by->id, 'environment' => $gateway->environment(),
+                'user_id' => $by->id, 'gateway' => $gateway->name(), 'environment' => $gateway->environment(),
                 'merchant_txn_id' => 'TEVW'.now()->format('ymdHis').Str::upper(Str::random(6)),
                 'amount' => number_format((float) $amount, 2, '.', ''), 'status' => Payment::CREATED,
             ]);
@@ -190,18 +191,18 @@ class PaymentService
     }
 
     /** Server-to-server notification. Returns false when the signature is invalid. */
-    public function handleWebhook(Company $company, string $rawBody, ?string $signature, ?string $ip): bool
+    public function handleWebhook(Company $company, string $rawBody, ?string $signature, ?string $ip, string $gatewayName = 'sabpaisa', ?string $eventId = null): bool
     {
         if (! $company->hasPaymentSetup()) {
             return false;
         }
-        $gateway = new SabPaisaGateway($company);
+        $gateway = $gatewayName === 'razorpay' ? new RazorpayGateway($company) : new SabPaisaGateway($company);
         $valid = $gateway->verifyWebhook($rawBody, $signature);
         $data = json_decode($rawBody, true) ?: [];
-        $payment = isset($data['merchant_txn_id'])
-            ? Payment::query()->where('company_id', $company->id)->where('merchant_txn_id', $data['merchant_txn_id'])->first()
-            : null;
-        $key = $valid ? ($data['idempotency_key'] ?? null) : null;
+        // SabPaisa sends merchant_txn_id; Razorpay sends the payment link's reference_id (our merchant_txn_id).
+        $txn = $data['merchant_txn_id'] ?? $data['payload']['payment_link']['entity']['reference_id'] ?? null;
+        $payment = $txn ? Payment::query()->where('company_id', $company->id)->where('merchant_txn_id', $txn)->first() : null;
+        $key = $valid ? ($data['idempotency_key'] ?? ($eventId ? 'rzp:'.$eventId : null)) : null;
 
         // De-duplicate: the same delivery is processed once.
         if ($key && PaymentEvent::query()->where('idempotency_key', $key)->exists()) {
@@ -271,6 +272,7 @@ class PaymentService
                 'gateway_txn_id' => $result['gateway_txn_id'],
                 'paid_amount' => $result['paid_amount'] ?? $p->amount,
                 'payment_mode' => $result['payment_mode'],
+                'payment_instrument' => isset($result['instrument']) ? mb_substr((string) $result['instrument'], 0, 60) : null,
                 'bank_txn_id' => $result['bank_txn_id'],
                 'bank_rrn' => $result['bank_rrn'],
                 'paid_at' => now(),
@@ -309,6 +311,7 @@ class PaymentService
             $booking->forceFill(['status' => BookingStatus::Confirmed, 'confirmed_at' => now(), 'hold_expires_at' => null])->save();
             app(\App\Services\WalletService::class)->chargeBooking($booking->fresh('company'), $payment);
             DB::afterCommit(fn () => $booking->user?->notify(new BookingConfirmed($booking->fresh(['station', 'charger']), $payment)));
+            DB::afterCommit(fn () => app(\App\Services\OperatorAlertService::class)->newBooking($booking->fresh(['station', 'charger'])));
             DB::afterCommit(function () use ($booking, $payment) {
                 try {
                     app(\App\Services\InvoiceService::class)->issueForBooking($booking->fresh(), $payment->fresh());

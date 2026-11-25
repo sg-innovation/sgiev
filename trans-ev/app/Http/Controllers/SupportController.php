@@ -67,25 +67,12 @@ class SupportController extends Controller
     public function show(Request $request, Ticket $ticket): Response
     {
         abort_unless($ticket->requester_id === $request->user()->id, 404);
-        $ticket->load(['category', 'priority', 'booking.station', 'assignee', 'publicMessages.user']);
-        $tz = Station::TIMEZONE;
-
         return Inertia::render('support/show', [
-            'ticket' => self::summary($ticket) + [
-                'booking' => $ticket->booking ? ['code' => $ticket->booking->code, 'station' => $ticket->booking->station?->name] : null,
-                'canReply' => $ticket->status !== 'closed',
-                'canResolve' => $ticket->isActive(),
-                'canReopen' => $ticket->status === 'resolved',
-                'messages' => $ticket->publicMessages->map(fn (TicketMessage $m) => [
-                    'id' => $m->id,
-                    'mine' => $m->user_id === $ticket->requester_id,
-                    'author' => $m->user_id === $ticket->requester_id ? 'You' : ($m->user?->name ? $m->user->name.' · Support' : 'Trans EV support'),
-                    'body' => $m->body,
-                    'at' => $m->created_at->setTimezone($tz)->format('j M Y, g:i A'),
-                    'files' => collect($m->attachments ?? [])->map(fn ($f, $i) => ['name' => $f['name'], 'url' => route('support.file', [$ticket, $m->id, $i])])->values(),
-                ]),
-            ],
-            'limits' => ['files' => TicketService::maxFiles(), 'kb' => TicketService::maxKb()],
+            'ticket' => \App\Http\Resources\TicketThreadPresenter::present($ticket,
+                fn (TicketMessage $m, int $i) => route('support.file', [$ticket, $m->id, $i]),
+                $ticket->booking ? '/account/bookings/'.$ticket->booking->code : null),
+            'limits' => \App\Http\Resources\TicketThreadPresenter::limits(),
+            'replyByEmail' => \App\Http\Resources\TicketThreadPresenter::replyByEmail(),
         ]);
     }
 

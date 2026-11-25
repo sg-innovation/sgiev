@@ -53,7 +53,7 @@ class ChangeStatusAction
                 try {
                     app(StationStatusService::class)->change(
                         $record,
-                        StationStatus::from($data['status']),
+                        $data['status'] instanceof StationStatus ? $data['status'] : StationStatus::from($data['status']),
                         $data['reason'] ?? null,
                         filled($data['until'] ?? null) ? \Illuminate\Support\Carbon::parse($data['until']) : null,
                     );

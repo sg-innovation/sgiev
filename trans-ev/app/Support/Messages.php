@@ -22,6 +22,42 @@ final class Messages
             'mail' => ['subject' => 'Booking confirmed: {{booking_code}}', 'action_label' => 'View booking & receipt', 'body' => "# Your charging slot is confirmed\n\n{{station}}\n\n{{slot}} (IST)\n\nCharger {{charger}}\n\nAmount paid: ₹{{amount}} (ref. {{payment_ref}})\n\nPlease arrive on time. The slot may be released if charging does not start within {{no_show_minutes}} minutes of the start time."],
             'sms' => ['body' => 'Trans EV: booking {{booking_code}} confirmed at {{station}}, {{slot}}. Paid Rs {{amount}}.'],
         ],
+        'auth.otp' => [
+            'label' => 'Login code (SMS)',
+            'vars' => ['code' => 'Six-digit code', 'minutes' => 'Valid for (minutes)'],
+            'sms' => ['body' => '{{code}} is your Trans EV login code. It is valid for {{minutes}} minutes. Do not share it with anyone.'],
+        ],
+        'booking.new_for_operator' => [
+            'label' => 'New booking at your station (to station staff)',
+            'vars' => ['name' => 'Staff name', 'booking_code' => 'Booking code', 'station' => 'Station', 'charger' => 'Charger', 'slot' => 'Slot', 'customer' => 'Customer', 'vehicle' => 'Vehicle', 'amount' => 'Amount paid'],
+            'mail' => ['subject' => 'New booking {{booking_code}} at {{station}}', 'action_label' => 'Open booking', 'body' => "# Hello {{name}},\n\nA customer has booked and paid.\n\nBooking: {{booking_code}}\nStation: {{station}} · charger {{charger}}\nSlot: {{slot}}\nCustomer: {{customer}} · {{vehicle}}\nPaid: Rs {{amount}}"],
+            'sms' => ['body' => 'Trans EV: new booking {{booking_code}} at {{station}}, {{slot}}, charger {{charger}}.'],
+        ],
+        'maintenance.assigned' => [
+            'label' => 'Maintenance work order assigned (to staff)',
+            'vars' => ['name' => 'Staff name', 'number' => 'Work order', 'title' => 'Title', 'type' => 'Type', 'priority' => 'Priority', 'charger' => 'Charger', 'station' => 'Station'],
+            'mail' => ['subject' => 'Work order {{number}} ({{priority}}): {{title}}', 'action_label' => 'Open work order', 'body' => "# Hello {{name}},\n\nA work order has been assigned to you.\n\n{{number}} · {{type}} · {{priority}} priority\nCharger {{charger}} at {{station}}\n\n{{title}}"],
+        ],
+        'franchise.application' => [
+            'label' => 'Franchise application received (to Trans EV)',
+            'vars' => ['name' => 'Recipient', 'franchise' => 'Franchise name', 'code' => 'Code', 'region' => 'Territory'],
+            'mail' => ['subject' => 'New franchise application: {{franchise}}', 'action_label' => 'Review application', 'body' => "# Hello {{name}},\n\n{{franchise}} ({{region}}) has applied to become a Trans EV franchise partner."],
+        ],
+        'franchise.approved' => [
+            'label' => 'Franchise approved (to the applicant)',
+            'vars' => ['name' => 'Contact name', 'franchise' => 'Franchise name', 'code' => 'Code', 'percent' => 'Commission %', 'region' => 'Territory'],
+            'mail' => ['subject' => 'Welcome to Trans EV, {{franchise}}', 'action_label' => 'Visit Trans EV', 'body' => "# Hello {{name}},\n\nYour franchise {{franchise}} ({{code}}) is approved for {{region}}. Your commission is {{percent}}% of the net sales of your stations, paid monthly.\n\nOur team will contact you to set up your stations and your regional manager login."],
+        ],
+        'franchise.rejected' => [
+            'label' => 'Franchise application not approved (to the applicant)',
+            'vars' => ['name' => 'Contact name', 'franchise' => 'Franchise name', 'reason' => 'Reason'],
+            'mail' => ['subject' => 'Your Trans EV franchise application', 'action_label' => '', 'body' => "# Hello {{name}},\n\nThank you for applying with {{franchise}}. We are not able to approve it at this time.\n\nReason: {{reason}}"],
+        ],
+        'franchise.payout_paid' => [
+            'label' => 'Franchise commission paid (to the franchise)',
+            'vars' => ['name' => 'Contact name', 'franchise' => 'Franchise name', 'month' => 'Month', 'amount' => 'Amount', 'reference' => 'Bank reference'],
+            'mail' => ['subject' => 'Commission for {{month}} paid', 'action_label' => '', 'body' => "# Hello {{name}},\n\nWe have paid {{franchise}}’s commission for {{month}}: Rs {{amount}}.\n\nBank reference: {{reference}}"],
+        ],
         'gst.invoice' => [
             'label' => 'GST tax invoice issued (to customer)',
             'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'number' => 'Invoice number', 'amount' => 'Invoice total'],
@@ -36,6 +72,16 @@ final class Messages
             'label' => 'GST debit note issued (to customer)',
             'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'number' => 'Debit note number', 'amount' => 'Debit note total'],
             'mail' => ['subject' => 'Debit note {{number}} · Trans EV booking {{booking_code}}', 'action_label' => 'View booking', 'body' => "# Hello {{name}},\n\nA debit note for booking {{booking_code}} is attached. It adds ₹{{amount}} to the original invoice for the extra energy delivered, which you have paid."],
+        ],
+        'review.request' => [
+            'label' => 'Rate your charge (to customer, after charging)',
+            'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'station' => 'Station', 'address' => 'Station address', 'slot' => 'Date and time', 'charger' => 'Charger', 'days' => 'Days to rate'],
+            'mail' => ['subject' => 'How was charging at {{station}}?', 'action_label' => 'Rate your charge', 'body' => "# Hello {{name}},\n\nThanks for charging at **{{station}}** ({{slot}}).\n\nHow did it go? A quick star rating helps other drivers and helps the station improve. It takes ten seconds.\n\nYou can rate this booking for {{days}} days."],
+        ],
+        'review.reply' => [
+            'label' => 'The station replied to your review (to customer)',
+            'vars' => ['name' => 'Customer name', 'booking_code' => 'Booking code', 'station' => 'Station', 'slot' => 'Date and time', 'operator' => 'Operator', 'reply' => 'Reply text'],
+            'mail' => ['subject' => '{{operator}} replied to your review', 'action_label' => 'See the reply', 'body' => "# Hello {{name}},\n\n{{operator}} replied to your review of **{{station}}**:\n\n“{{reply}}”"],
         ],
         'waitlist.offer' => [
             'label' => 'Waiting list: a slot opened up (to customer)',
@@ -99,9 +145,14 @@ final class Messages
         ],
         'ticket.agent_reply' => [
             'label' => 'Support: reply from support (to requester)',
-            'vars' => ['name' => 'Requester name', 'number' => 'Ticket number', 'subject' => 'Ticket subject', 'status' => 'Ticket status'],
-            'mail' => ['subject' => 'Reply on your ticket {{number}}', 'action_label' => 'Open ticket', 'body' => "# Hello {{name}},\n\nWe have replied to your ticket.\n\nTicket: {{number}} · {{subject}}\n\nStatus: {{status}}."],
+            'vars' => ['name' => 'Requester name', 'number' => 'Ticket number', 'subject' => 'Ticket subject', 'status' => 'Ticket status', 'message' => 'The reply (first part)'],
+            'mail' => ['subject' => 'Reply on your ticket {{number}}', 'action_label' => 'Open ticket', 'body' => "# Hello {{name}},\n\nWe have replied to your ticket {{number}} · {{subject}}:\n\n{{message}}\n\nStatus: {{status}}. Reply to this email or open the ticket to answer."],
             'sms' => ['body' => 'Trans EV support replied to your ticket {{number}}. Open your account to read it.'],
+        ],
+        'ticket.received' => [
+            'label' => 'Support: we received your message (to a guest requester)',
+            'vars' => ['name' => 'Requester name', 'number' => 'Ticket number', 'subject' => 'Ticket subject'],
+            'mail' => ['subject' => 'We have received your message · {{number}}', 'action_label' => 'View your ticket', 'body' => "# Hello {{name}},\n\nThank you for contacting Trans EV. We have opened support ticket {{number}} · {{subject}} and will reply soon.\n\nFollow the conversation and reply with the button below, or simply reply to this email. Keep this link private: anyone with it can read the ticket."],
         ],
         'ticket.requester_reply' => [
             'label' => 'Support: requester replied (to agent)',
@@ -203,6 +254,9 @@ Please review them in Billing & GST → Reconciliation."],
             'sms' => ['body' => 'Trans EV: a slot opened at {{station}} ({{slot}}). Pay by {{expires}} to confirm, booking {{booking_code}}.'],
             'whatsapp' => ['body' => 'A charging slot opened at {{station}}: {{slot}}. Pay by {{expires}} to confirm booking {{booking_code}}.'],
             'push' => ['subject' => 'A slot opened up', 'body' => '{{station}}, {{slot}}. Pay within {{minutes}} minutes to confirm.'],
+        ],
+        'review.request' => [
+            'push' => ['subject' => 'How was charging?', 'body' => 'Rate {{station}} in a few seconds.'],
         ],
         'booking.trueup' => [
             'push' => ['subject' => 'Charging complete', 'body' => '{{kwh}} kWh delivered. Final bill Rs {{final}}.'],

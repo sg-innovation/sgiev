@@ -47,6 +47,12 @@ class Payment extends Model
         return $this->belongsTo(Booking::class);
     }
 
+    /** Staff member who took cash or UPI at the station. */
+    public function collectedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'collected_by');
+    }
+
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
@@ -81,5 +87,13 @@ class Payment extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()->logOnly(['status', 'gateway_status', 'paid_amount', 'gateway_txn_id', 'verified_via'])->logOnlyDirty()->dontLogEmptyChanges();
+    }
+
+    /** "UPI · UPI ra•••@okicici" / "CARD · VISA •••• 4242" for receipts and invoices (never the full number or ID). */
+    public function methodLabel(): ?string
+    {
+        $parts = array_values(array_filter([$this->payment_mode ? strtoupper((string) $this->payment_mode) : null, $this->payment_instrument]));
+
+        return $parts ? implode(' · ', array_unique($parts)) : null;
     }
 }

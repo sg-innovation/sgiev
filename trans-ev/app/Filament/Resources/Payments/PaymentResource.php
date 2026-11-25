@@ -31,7 +31,7 @@ class PaymentResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return Tenancy::scope(parent::getEloquentQuery()->with(['booking', 'company']));
+        return Tenancy::scope(parent::getEloquentQuery()->with(['booking', 'company', 'collectedBy']));
     }
 
     public static function infolist(Schema $schema): Schema

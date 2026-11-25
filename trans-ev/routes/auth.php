@@ -20,6 +20,10 @@ Route::middleware('guest')->group(function () {
         ->name('login');
 
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
+    Route::post('login/otp/send', [\App\Http\Controllers\Auth\OtpLoginController::class, 'send'])->middleware('throttle:otp')->name('login.otp.send');
+    Route::post('login/otp/verify', [\App\Http\Controllers\Auth\OtpLoginController::class, 'verify'])->middleware('throttle:otp')->name('login.otp.verify');
+    Route::get('two-factor-challenge', [\App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'create'])->name('two-factor.challenge');
+    Route::post('two-factor-challenge', [\App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'store'])->middleware('throttle:6,1')->name('two-factor.verify');
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');

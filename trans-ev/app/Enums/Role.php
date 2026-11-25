@@ -14,6 +14,7 @@ enum Role: string
     case Finance = 'finance';
     case StationManager = 'station_manager';
     case Auditor = 'auditor';
+    case RegionalManager = 'regional_manager'; // Trans EV staff over a franchise's stations (G3)
     case Customer = 'customer';
 
     /** @return list<string> */
@@ -26,6 +27,7 @@ enum Role: string
             self::Finance->value,
             self::StationManager->value,
             self::Auditor->value,
+            self::RegionalManager->value,
             ...array_keys(\App\Support\RoleRegistry::custom()),
         ];
     }

@@ -160,6 +160,10 @@ class StaffConsoleController extends Controller
         $s = $this->sessions->stop($session, $request->user(), isset($data['meter_stop']) ? (string) $data['meter_stop'] : null,
             isset($data['energy']) ? (string) $data['energy'] : null, $data['reason'], $data['note'] ?? null);
 
+        if ($s->status === 'active') {
+            return back()->with('success', 'Stop sent to the charger. The bill is made from its meter as soon as it confirms.');
+        }
+
         return back()->with('success', 'Charging stopped: '.number_format((float) $s->energy_kwh, 2).' kWh in '.$s->minutes().' min.');
     }
 

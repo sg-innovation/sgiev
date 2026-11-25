@@ -51,6 +51,7 @@ final class StationPresenter
                 ->map(fn ($c) => ['value' => $c, 'label' => ConnectorType::tryFrom($c)?->getLabel() ?? $c]),
             'fromRate' => $minRate !== null ? (float) $minRate : null,
             'amenities' => $station->amenities ?? [],
+            'rating' => $station->rating_count > 0 ? ['avg' => round((float) $station->rating_avg, 1), 'count' => (int) $station->rating_count] : null,
         ];
     }
 

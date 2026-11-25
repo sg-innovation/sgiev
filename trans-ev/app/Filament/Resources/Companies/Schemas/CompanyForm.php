@@ -88,7 +88,15 @@ class CompanyForm
                     \Filament\Infolists\Components\TextEntry::make('plan_features')->label('Included features')
                         ->state(fn ($record) => collect(\App\Models\Plan::FEATURES)->only(($record?->plan ?? \App\Models\Plan::default())?->features ?? [])->implode(' · ') ?: '—'),
                 ]),
+            Section::make('Payment gateway')->icon('heroicon-o-banknotes')->columnSpanFull()
+                ->description('Choose which gateway collects customer payments for this company’s stations. Money goes straight to the company’s own merchant account.')
+                ->schema([
+                    \Filament\Forms\Components\ToggleButtons::make('payment_gateway')->label('Gateway')->inline()->live()->required()->default(fn () => \App\Support\Settings::get('payments.default_gateway') ?: 'sabpaisa')
+                        ->options(\App\Services\Payments\GatewayFactory::GATEWAYS)
+                        ->helperText('Payments already taken keep using the gateway that processed them (for refunds and status checks).'),
+                ]),
             Section::make('Online payments (SabPaisa)')->icon('heroicon-o-credit-card')->columns(2)->columnSpanFull()
+                ->visible(fn ($get) => ($get('payment_gateway') ?: 'sabpaisa') === 'sabpaisa')
                 ->description('Customer payments for this company’s stations go straight to this SabPaisa merchant account. Keys are stored encrypted and never shown again.')
                 ->schema([
                     Select::make('sabpaisa_env')->label('Environment')->options(['staging' => 'Staging (test)', 'production' => 'Production (live)'])->default('staging')->required(),
@@ -99,6 +107,18 @@ class CompanyForm
                     TextInput::make('webhook_url')->label('Webhook URL to give SabPaisa')->dehydrated(false)->readOnly()->columnSpanFull()
                         ->formatStateUsing(fn ($record) => $record ? route('payments.webhook', $record->slug) : 'Shown after the company is created')
                         ->helperText('Send this URL to the SabPaisa integration team so payment updates reach this company. Must be HTTPS in production.'),
+                ]),
+            Section::make('Online payments (Razorpay)')->icon('heroicon-o-credit-card')->columns(2)->columnSpanFull()
+                ->visible(fn ($get) => $get('payment_gateway') === 'razorpay')
+                ->description('Uses Razorpay Payment Links. A key starting rzp_test_ runs in test mode, rzp_live_ takes real money. Secrets are stored encrypted and never shown again.')
+                ->schema([
+                    TextInput::make('razorpay_key_id')->label('Key ID')->maxLength(60)->regex('/^rzp_(test|live)_[A-Za-z0-9]+$/')
+                        ->validationMessages(['regex' => 'Razorpay key IDs start with rzp_test_ or rzp_live_.']),
+                    $secret('razorpay_key_secret', 'Key secret'),
+                    $secret('razorpay_webhook_secret', 'Webhook secret'),
+                    TextInput::make('razorpay_webhook_url')->label('Webhook URL for the Razorpay dashboard')->dehydrated(false)->readOnly()->columnSpanFull()
+                        ->formatStateUsing(fn ($record) => $record ? route('payments.webhook.razorpay', $record->slug) : 'Shown after the company is created')
+                        ->helperText('In Razorpay → Settings → Webhooks, add this URL with the same webhook secret and tick payment_link.paid, payment_link.expired and refund.processed.'),
                 ]),
             Section::make('Website footer & invoice')->columnSpanFull()->collapsed()
                 ->visible(fn ($record) => $record?->is_platform || Tenancy::isPlatformAdmin())

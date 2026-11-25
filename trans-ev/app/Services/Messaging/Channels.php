@@ -56,11 +56,30 @@ class Channels
     public static function configured(string $channel): bool
     {
         return match ($channel) {
-            'sms' => filled(Settings::get('sms.msg91_auth_key')) && filled(Settings::get('sms.msg91_sender_id')),
-            'whatsapp' => filled(Settings::get('whatsapp.access_token')) && filled(Settings::get('whatsapp.phone_number_id')),
+            'sms' => self::provider('sms') === 'smsbirds'
+                ? filled(Settings::get('sms.smsbirds_url')) && filled(Settings::get('sms.smsbirds_username')) && filled(Settings::get('sms.smsbirds_api_key')) && filled(Settings::get('sms.smsbirds_sender'))
+                : filled(Settings::get('sms.msg91_auth_key')) && filled(Settings::get('sms.msg91_sender_id')),
+            'whatsapp' => self::provider('whatsapp') === 'sgiconnects'
+                ? filled(Settings::get('whatsapp.sgi_base_url')) && filled(Settings::get('whatsapp.sgi_license')) && filled(Settings::get('whatsapp.sgi_api_key'))
+                : filled(Settings::get('whatsapp.access_token')) && filled(Settings::get('whatsapp.phone_number_id')),
             'push' => filled(Settings::get('push.fcm_project_id')) && filled(Settings::get('push.fcm_service_account')),
             default => false,
         };
+    }
+
+    /** Providers each channel can use (chosen in Settings → Integrations). */
+    public const PROVIDERS = [
+        'sms' => ['msg91' => 'MSG91', 'smsbirds' => 'SMS Birds'],
+        'whatsapp' => ['meta' => 'Meta WhatsApp Cloud API', 'sgiconnects' => 'SGI Connects'],
+    ];
+
+    /** Selected provider for a channel (falls back to the first one). */
+    public static function provider(string $channel): string
+    {
+        $options = self::PROVIDERS[$channel] ?? [];
+        $chosen = (string) Settings::get($channel.'.provider');
+
+        return array_key_exists($chosen, $options) ? $chosen : (string) array_key_first($options);
     }
 
     /** +91 E.164 digits for an Indian mobile. */

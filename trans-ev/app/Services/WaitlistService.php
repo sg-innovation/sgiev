@@ -28,6 +28,9 @@ class WaitlistService
 
     public function join(User $user, Station $station, array $d): WaitlistEntry
     {
+        if (! ($station->company?->hasFeature('waitlist') ?? false)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['date' => 'This station does not offer a waiting list.']);
+        }
         if (BusinessRules::int('waitlist.enabled') !== 1) {
             throw ValidationException::withMessages(['date' => 'The waiting list is not available.']);
         }

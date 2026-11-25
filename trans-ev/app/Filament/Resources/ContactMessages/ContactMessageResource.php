@@ -26,6 +26,12 @@ use UnitEnum;
 /** Support inbox for queries sent through the website contact form. */
 class ContactMessageResource extends Resource
 {
+    /** Every new query becomes a ticket; this inbox only shows while older messages still wait to be converted. */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return parent::shouldRegisterNavigation() && static::getModel()::query()->whereNull('ticket_id')->whereNotIn('status', ['resolved', 'closed', 'spam'])->exists();
+    }
+
     protected static ?string $model = ContactMessage::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedInboxStack;

@@ -125,31 +125,31 @@ class TicketSlaTest extends TestCase
         $this->assertSame('resolved', ContactMessage::sole()->status);
     }
 
-    public function test_guest_message_converts_to_ticket_with_new_account(): void
+    public function test_guest_message_becomes_a_guest_ticket_without_an_account(): void
     {
         $this->post('/contact', [
-            'topic' => 'feedback', 'name' => 'Guest Person', 'email' => 'guest@example.com', 'phone' => '9876512345', 'subject' => 'Great app',
+            'topic' => 'feedback', 'name' => 'Guest Person', 'email' => 'Guest@Example.com', 'phone' => '9876512345', 'subject' => 'Great app',
             'message' => 'Please add more chargers near the airport.', 'consent' => '1',
-        ])->assertSessionHas('success');
-        $msg = ContactMessage::sole();
-        $this->assertNull($msg->ticket_id);
-        $this->assertSame(0, Ticket::count());
+        ])->assertSessionHas('success', fn ($m) => str_contains($m, 'private link'));
+        $t = Ticket::sole();
+        $this->assertNull($t->requester_id);
+        $this->assertTrue($t->isGuest());
+        $this->assertSame(['Guest Person', 'guest@example.com', '9876512345'], [$t->guest_name, $t->guest_email, $t->guest_phone]);
+        $this->assertSame('feedback', $t->category->slug);
+        $this->assertSame($t->id, ContactMessage::sole()->ticket_id);
+        $this->assertFalse(User::where('email', 'guest@example.com')->exists(), 'no account is created');
+        Notification::assertSentOnDemand(\App\Notifications\TicketUpdate::class,
+            fn ($n, $channels, $notifiable) => $n->template === 'ticket.received' && array_key_exists('guest@example.com', (array) $notifiable->routes['mail']));
 
+        // Older inbox messages are converted by staff the same way; converting twice does nothing new.
+        $old = ContactMessage::create(['topic' => 'other', 'name' => 'Old Guest', 'email' => 'old@example.com', 'subject' => 'Earlier question', 'message' => 'Sent before tickets were automatic.']);
         $admin = User::factory()->create(['company_id' => Company::where('is_platform', true)->value('id')]);
         $admin->assignRole(Role::SuperAdmin->value);
         $this->actingAs($admin);
-        Livewire::test(ListContactMessages::class)->callTableAction('toTicket', $msg);
-
-        $guest = User::where('email', 'guest@example.com')->sole();
-        $this->assertTrue($guest->hasRole(Role::Customer->value));
-        $this->assertSame('9876512345', $guest->phone);
-        $t = Ticket::sole();
-        $this->assertSame($guest->id, $t->requester_id);
-        $this->assertSame('feedback', $t->category->slug);
-        Notification::assertSentTo($guest, ResetPassword::class);
-        // Converting again does nothing new.
-        app(TicketService::class)->fromContactMessage($msg->fresh(), $admin);
-        $this->assertSame(1, Ticket::count());
+        Livewire::test(ListContactMessages::class)->callTableAction('toTicket', $old);
+        $this->assertSame('old@example.com', Ticket::latest('id')->first()->guest_email);
+        app(TicketService::class)->fromContactMessage($old->fresh(), $admin);
+        $this->assertSame(2, Ticket::count());
     }
 
     public function test_ticket_list_shows_sla_stats_and_breached_filter(): void

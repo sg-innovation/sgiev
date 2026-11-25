@@ -21,6 +21,11 @@ class SimulatedSabPaisaGateway implements PaymentGateway
         }
     }
 
+    public function name(): string
+    {
+        return 'sabpaisa';
+    }
+
     public static function secret(): string
     {
         return hash('sha256', 'sabpaisa-simulator|'.config('app.key'));
@@ -96,6 +101,7 @@ class SimulatedSabPaisaGateway implements PaymentGateway
             'payment_mode' => $s['mode'] ?? null,
             'bank_txn_id' => isset($s['txn_id']) ? 'SIMBANK'.substr($s['txn_id'], -6) : null,
             'bank_rrn' => null,
+            'instrument' => ($s['status'] ?? '') === 'SUCCESS' ? \App\Support\PaymentInstrument::upi('demo.payer@okaxis') : null,
             'raw' => ['simulated' => true] + $s,
         ];
     }

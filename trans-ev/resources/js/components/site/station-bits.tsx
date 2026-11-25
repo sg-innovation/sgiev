@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 import { type StationCard, type StationStatus } from '@/types/station';
 import { Link } from '@inertiajs/react';
-import { ArrowRight, BatteryCharging, Clock, MapPin, Navigation, Zap } from 'lucide-react';
+import { ArrowRight, BatteryCharging, Clock, MapPin, Navigation, Star, Zap } from 'lucide-react';
 
 export const STATUS_STYLES: Record<StationStatus | 'closed', { dot: string; pill: string; label: string }> = {
     online: { dot: 'bg-emerald-500', pill: 'bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-300', label: 'Online' },
@@ -55,6 +55,13 @@ export function StationCardView({ station, active, onHover }: { station: Station
                     </p>
                     {station.operator?.name && !station.operator.isPlatform && (
                         <p className="mt-1 text-xs font-medium text-electric">Operated by {station.operator.name}</p>
+                    )}
+                    {station.rating && (
+                        <p className="mt-1 flex items-center gap-1 text-xs">
+                            <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                            <span className="font-semibold">{station.rating.avg.toFixed(1)}</span>
+                            <span className="text-muted-foreground">({station.rating.count})</span>
+                        </p>
                     )}
                 </div>
                 <StatusPill state={state} className="shrink-0" />

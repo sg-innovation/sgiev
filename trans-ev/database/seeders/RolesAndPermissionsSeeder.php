@@ -25,16 +25,17 @@ class RolesAndPermissionsSeeder extends Seeder
         'coupons.view', 'coupons.manage',
         'invoices.export', 'cancellation.manage', 'wallet.view', 'wallet.recharge',
         'tickets.view', 'tickets.reply', 'tickets.assign', 'tickets.manage',
-        'reconciliation.view', 'sessions.manage', 'walkins.manage',
+        'reconciliation.view', 'sessions.manage', 'walkins.manage', 'reviews.view', 'reviews.reply',
+        'reports.view', 'reports.export', 'reports.costs', 'maintenance.view', 'maintenance.manage', 'franchises.view', 'ocpp.view', 'ocpp.command', 'ocpp.configure',
         // Platform-only (effective for Trans EV staff only; see PLATFORM_ONLY)
         'platform.all_companies', 'partners.review', 'plans.manage', 'integrations.manage', 'roles.manage', 'customers.block',
-        'settings.manage', 'content.manage', 'lookups.manage', 'platform_fees.manage', 'reconciliation.manage', 'notifications.log',
+        'settings.manage', 'content.manage', 'lookups.manage', 'platform_fees.manage', 'reconciliation.manage', 'notifications.log', 'reviews.moderate', 'franchises.manage', 'api.developers',
     ];
 
     /** Initial labels and grouping stored with each permission (editable data, shown on Roles & permissions). */
     public const GROUPS = [
         'stations' => 'Stations', 'tariffs' => 'Tariffs & pricing', 'rules' => 'Station rules', 'bookings' => 'Bookings & customers',
-        'payments' => 'Payments & refunds', 'coupons' => 'Coupons & offers', 'invoices' => 'Invoices & GST', 'cancellation' => 'Cancellation policies', 'wallet' => 'Trans EV wallet', 'tickets' => 'Support tickets', 'sessions' => 'Charging sessions', 'notifications' => 'Notifications', 'walkins' => 'Walk-ins', 'reconciliation' => 'Reconciliation',
+        'payments' => 'Payments & refunds', 'coupons' => 'Coupons & offers', 'invoices' => 'Invoices & GST', 'cancellation' => 'Cancellation policies', 'wallet' => 'Trans EV wallet', 'tickets' => 'Support tickets', 'sessions' => 'Charging sessions', 'notifications' => 'Notifications', 'walkins' => 'Walk-ins', 'reviews' => 'Ratings & reviews', 'reconciliation' => 'Reconciliation', 'reports' => 'Reports', 'maintenance' => 'Maintenance', 'ocpp' => 'Charger control (OCPP)', 'api' => 'API & developers', 'franchises' => 'Franchises',
         'company' => 'Company profile', 'users' => 'Staff', 'support' => 'Contact-form queries', 'blog' => 'Blog', 'audit' => 'Audit log',
         'platform' => 'Platform access', 'partners' => 'Partner review', 'plans' => 'Plans', 'integrations' => 'Integrations',
         'roles' => 'Roles', 'customers' => 'Customers', 'settings' => 'Business rules', 'content' => 'Website pages', 'lookups' => 'Lists & options', 'platform_fees' => 'Platform fees',
@@ -63,6 +64,15 @@ class RolesAndPermissionsSeeder extends Seeder
         'walkins.manage' => 'Start walk-in charging and take payment at the station (cash, UPI, payment link)',
         'reconciliation.manage' => 'Run reconciliation, fix, assign and resolve exceptions',
         'notifications.log' => 'See the notification delivery log (emails, SMS, WhatsApp, push)',
+        'reviews.view' => 'See ratings and reviews of their stations', 'reviews.reply' => 'Reply publicly to reviews',
+        'reviews.moderate' => 'Approve or hide reviews (all companies)',
+        'reports.view' => 'See business reports (revenue, sessions, GST, fees)', 'reports.export' => 'Download reports as PDF or Excel',
+        'reports.costs' => 'Enter station electricity costs (for profit estimates)',
+        'maintenance.view' => 'See charger work orders', 'maintenance.manage' => 'Open, assign and close charger work orders (can take a charger out of service)',
+        'ocpp.view' => 'See charger connections and the OCPP log', 'ocpp.command' => 'Send remote commands to chargers (start, stop, restart, unlock…)',
+        'ocpp.configure' => 'Set charger OCPP identity and password',
+        'api.developers' => 'Give app developers access to the API developer portal (PIN)',
+        'franchises.view' => 'See their own franchise (regional managers)', 'franchises.manage' => 'Approve franchises, set stations, managers and commission; approve payouts',
         'platform.all_companies' => 'See every company’s data (not just Trans EV)',
         'partners.review' => 'Approve partners, verify KYC, approve stations, suspend companies',
         'plans.manage' => 'Edit plans, features and company plans', 'integrations.manage' => 'Manage email, SMS, payment and other keys',
@@ -73,7 +83,7 @@ class RolesAndPermissionsSeeder extends Seeder
     ];
 
     /** Only take effect for Trans EV (platform) staff: a partner company can never use these. */
-    public const PLATFORM_ONLY = ['platform.all_companies', 'partners.review', 'plans.manage', 'integrations.manage', 'roles.manage', 'customers.block', 'settings.manage', 'content.manage', 'lookups.manage', 'platform_fees.manage', 'reconciliation.manage', 'notifications.log',
+    public const PLATFORM_ONLY = ['platform.all_companies', 'partners.review', 'plans.manage', 'integrations.manage', 'roles.manage', 'customers.block', 'settings.manage', 'content.manage', 'lookups.manage', 'platform_fees.manage', 'reconciliation.manage', 'notifications.log', 'reviews.moderate', 'franchises.manage', 'api.developers',
         'blog.view', 'blog.manage', 'blog.publish', 'support.view', 'support.manage'];
 
     public function run(): void
@@ -107,18 +117,19 @@ class RolesAndPermissionsSeeder extends Seeder
                 'company.view', 'company.manage', 'users.view', 'users.manage',
                 'bookings.view', 'bookings.manage', 'blog.view', 'blog.manage', 'blog.publish',
                 'support.view', 'support.manage', 'audit.view', 'payments.view', 'payments.refund',
-                'coupons.view', 'coupons.manage', 'invoices.export', 'cancellation.manage', 'wallet.view', 'wallet.recharge', 'tickets.view', 'tickets.reply', 'tickets.assign', 'tickets.manage', 'reconciliation.view', 'sessions.manage', 'walkins.manage',
+                'coupons.view', 'coupons.manage', 'invoices.export', 'cancellation.manage', 'wallet.view', 'wallet.recharge', 'tickets.view', 'tickets.reply', 'tickets.assign', 'tickets.manage', 'reconciliation.view', 'sessions.manage', 'walkins.manage', 'reviews.view', 'reviews.reply', 'reports.view', 'reports.export', 'reports.costs', 'maintenance.view', 'maintenance.manage', 'ocpp.view', 'ocpp.command', 'ocpp.configure',
             ],
             RoleEnum::OperationsAdmin->value => [
                 'stations.view', 'stations.manage', 'stations.status', 'stations.hours',
                 'tariffs.view', 'rules.view', 'rules.manage', 'company.view',
                 'bookings.view', 'bookings.manage', 'blog.view', 'blog.manage', 'blog.publish',
                 'support.view', 'support.manage', 'payments.view', 'coupons.view', 'coupons.manage', 'cancellation.manage',
-                'tickets.view', 'tickets.reply', 'tickets.assign', 'sessions.manage', 'walkins.manage',
+                'tickets.view', 'tickets.reply', 'tickets.assign', 'sessions.manage', 'walkins.manage', 'reviews.view', 'reviews.reply', 'reports.view', 'maintenance.view', 'maintenance.manage', 'ocpp.view', 'ocpp.command', 'ocpp.configure',
             ],
-            RoleEnum::Finance->value => ['stations.view', 'tariffs.view', 'tariffs.manage', 'company.view', 'bookings.view', 'support.view', 'audit.view', 'payments.view', 'payments.refund', 'coupons.view', 'invoices.export', 'wallet.view', 'wallet.recharge', 'tickets.view', 'tickets.reply', 'reconciliation.view'],
-            RoleEnum::StationManager->value => ['stations.view', 'stations.status', 'stations.hours', 'tariffs.view', 'rules.view', 'bookings.view', 'bookings.manage', 'tickets.view', 'tickets.reply', 'sessions.manage', 'walkins.manage'],
-            RoleEnum::Auditor->value => ['stations.view', 'tariffs.view', 'rules.view', 'company.view', 'users.view', 'bookings.view', 'blog.view', 'support.view', 'audit.view', 'payments.view', 'coupons.view', 'tickets.view', 'reconciliation.view'],
+            RoleEnum::Finance->value => ['stations.view', 'tariffs.view', 'tariffs.manage', 'company.view', 'bookings.view', 'support.view', 'audit.view', 'payments.view', 'payments.refund', 'coupons.view', 'invoices.export', 'wallet.view', 'wallet.recharge', 'tickets.view', 'tickets.reply', 'reconciliation.view', 'reports.view', 'reports.export', 'reports.costs', 'maintenance.view'],
+            RoleEnum::StationManager->value => ['stations.view', 'stations.status', 'stations.hours', 'tariffs.view', 'rules.view', 'bookings.view', 'bookings.manage', 'tickets.view', 'tickets.reply', 'sessions.manage', 'walkins.manage', 'reviews.view', 'reports.view', 'maintenance.view', 'maintenance.manage', 'ocpp.view', 'ocpp.command'],
+            RoleEnum::Auditor->value => ['stations.view', 'tariffs.view', 'rules.view', 'company.view', 'users.view', 'bookings.view', 'blog.view', 'support.view', 'audit.view', 'payments.view', 'coupons.view', 'tickets.view', 'reconciliation.view', 'reports.view', 'reports.export', 'maintenance.view', 'ocpp.view'],
+            RoleEnum::RegionalManager->value => ['stations.view', 'bookings.view', 'reports.view', 'reports.export', 'maintenance.view', 'reviews.view', 'franchises.view', 'ocpp.view'],
             RoleEnum::Customer->value => [],
         ];
 
@@ -129,6 +140,7 @@ class RolesAndPermissionsSeeder extends Seeder
             RoleEnum::Finance->value => ['Finance', 'Payments, refunds, tariffs and the audit log.'],
             RoleEnum::StationManager->value => ['Station manager', 'Only their assigned stations: status, hours and bookings.'],
             RoleEnum::Auditor->value => ['Auditor', 'Read-only access for financial and security audits.'],
+            RoleEnum::RegionalManager->value => ['Regional manager', 'Trans EV staff for a franchise: its stations’ bookings, maintenance, reviews and reports (read-only).'],
             RoleEnum::Customer->value => ['Customer', 'Books and pays for charging on the website. No admin access.'],
         ];
 

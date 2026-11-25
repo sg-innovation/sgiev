@@ -1,6 +1,9 @@
 <?php
 
 return [
+
+    // Gateway pre-selected for new companies (each company can switch on its own page): sabpaisa | razorpay.
+    'default_gateway' => env('PAYMENT_DEFAULT_GATEWAY', 'sabpaisa'),
     'sabpaisa' => [
         'base_urls' => [
             'staging' => env('SABPAISA_STAGING_URL', 'https://staging-sb-merchant-api.sabpaisa.in'),

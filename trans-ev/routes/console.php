@@ -50,3 +50,14 @@ Schedule::call(fn () => app(\App\Services\WaitlistService::class)->match())->nam
 
 // D2: ticket SLA warnings, breaches and escalation.
 Schedule::call(fn () => app(\App\Services\TicketService::class)->checkSla())->name('tickets:sla')->everyFiveMinutes()->withoutOverlapping();
+
+// D3: ask customers to rate a while after charging.
+Schedule::call(fn () => app(\App\Services\ReviewService::class)->sendRequests())->name('reviews:request')->everyTenMinutes()->withoutOverlapping();
+
+// G3: franchise commission drafts for last month, on the 1st (approved and paid in Admin → Franchises).
+\Illuminate\Support\Facades\Schedule::call(fn () => app(\App\Services\FranchiseService::class)->generateMonthly())->monthlyOn(1, '06:00')->timezone('Asia/Kolkata')->name('franchises:payouts')->withoutOverlapping();
+// Phase F: if the OCPP server stops, chargers that went silent still show offline and stale commands time out.
+\Illuminate\Support\Facades\Schedule::call(function () {
+    app(\App\Services\Ocpp\OcppCentralSystem::class)->markSilentOffline();
+    app(\App\Services\Ocpp\OcppCommandService::class)->expire();
+})->everyMinute()->name('ocpp:sweep')->withoutOverlapping();

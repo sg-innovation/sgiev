@@ -35,7 +35,7 @@ class StationBoard extends Page
     {
         $u = auth()->user();
 
-        return (bool) ($u?->can('stations.view') && $u->can('bookings.view'));
+        return (bool) ($u?->can('stations.view') && $u->can('bookings.view')) && \App\Support\Features::enabled('live_dashboard', $u);
     }
 
     public function mount(): void

@@ -28,6 +28,7 @@
                             <span class="font-semibold text-gray-950 dark:text-white">
                                 {{ $m['author'] }}
                                 @if ($m['fromRequester']) <span class="font-normal text-gray-500">· requester</span> @endif
+                                @if ($m['viaEmail'] ?? false) <span class="font-normal text-gray-500">· by email</span> @endif
                                 @if ($m['internal']) <x-filament::badge color="warning" size="sm" class="ms-1 inline-flex">Internal note</x-filament::badge> @endif
                             </span>
                             <span class="text-gray-500 dark:text-gray-400">{{ $m['at'] }}</span>
@@ -83,10 +84,10 @@
             <x-filament::section>
                 <x-slot name="heading">Requester</x-slot>
                 <div class="text-sm">
-                    <p class="font-semibold text-gray-950 dark:text-white">{{ $t->requester?->name }}</p>
-                    <p class="text-gray-500 dark:text-gray-400">{{ $t->requester?->email }}</p>
-                    @if ($t->requester?->phone) <p class="text-gray-500 dark:text-gray-400">+91 {{ $t->requester->phone }}</p> @endif
-                    <p class="mt-1 text-gray-500 dark:text-gray-400">{{ $t->requesterCompany?->trade_name ?? 'Customer' }}</p>
+                    <p class="font-semibold text-gray-950 dark:text-white">{{ $t->requesterName() }}</p>
+                    <p class="text-gray-500 dark:text-gray-400">{{ $t->requesterEmail() }}</p>
+                    @if ($t->requesterPhone()) <p class="text-gray-500 dark:text-gray-400">+91 {{ $t->requesterPhone() }}</p> @endif
+                    <p class="mt-1 text-gray-500 dark:text-gray-400">{{ $t->isGuest() ? 'Guest (no account) · replies go by email' : ($t->requesterCompany?->trade_name ?? 'Customer') }}</p>
                     @if ($t->booking)
                         <a href="{{ \App\Filament\Resources\Bookings\BookingResource::getUrl('view', ['record' => $t->booking]) }}" class="mt-3 inline-flex items-center gap-1 text-primary-600 hover:underline dark:text-primary-400">
                             <x-filament::icon icon="heroicon-m-calendar-days" class="h-4 w-4" /> {{ $t->booking->code }} · {{ $t->booking->station?->name }}

@@ -4,18 +4,19 @@ import SettingsLayout from '@/layouts/settings/layout';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { Bell, CheckCircle2, LoaderCircle, Mail, MessageCircle, Smartphone } from 'lucide-react';
+import { Bell, CalendarPlus, CheckCircle2, LoaderCircle, Mail, MessageCircle, Smartphone } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Notifications', href: '/settings/notifications' }];
 
 interface Props {
-    prefs: { sms: boolean; whatsapp: boolean; push: boolean };
+    prefs: { sms: boolean; whatsapp: boolean; push: boolean; operator_bookings?: boolean };
+    isStaff: boolean;
     phone: string | null;
     email: string;
     devices: number;
 }
 
-export default function Notifications({ prefs, phone, email, devices }: Props) {
+export default function Notifications({ prefs, isStaff, phone, email, devices }: Props) {
     const { flash } = usePage<{ flash: { success?: string } }>().props;
     const form = useForm({ ...prefs });
 
@@ -23,6 +24,9 @@ export default function Notifications({ prefs, phone, email, devices }: Props) {
         { key: 'sms' as const, icon: Smartphone, title: 'SMS', desc: phone ? `To +91 ${phone}. Booking confirmations, reminders and offers from the waiting list.` : 'Add your mobile number in Profile to get SMS.', disabled: !phone },
         { key: 'whatsapp' as const, icon: MessageCircle, title: 'WhatsApp', desc: phone ? `To +91 ${phone}. We only message you on WhatsApp if you turn this on.` : 'Add your mobile number in Profile to get WhatsApp messages.', disabled: !phone },
         { key: 'push' as const, icon: Bell, title: 'App notifications', desc: devices ? `On ${devices} device${devices > 1 ? 's' : ''} with the Trans EV app.` : 'Install the Trans EV app to get notifications on your phone.', disabled: false },
+        ...(isStaff
+            ? [{ key: 'operator_bookings' as const, icon: CalendarPlus, title: 'New bookings at my stations', desc: 'Tell me when a customer books and pays at a station I look after (on the channels above).', disabled: false }]
+            : []),
     ];
 
     return (
@@ -50,7 +54,7 @@ export default function Notifications({ prefs, phone, email, devices }: Props) {
                                         <span className="block text-sm text-muted-foreground">{r.desc}</span>
                                     </span>
                                 </span>
-                                <input type="checkbox" role="switch" disabled={r.disabled} checked={form.data[r.key]} onChange={(e) => form.setData(r.key, e.target.checked)} className="mt-1 size-5 shrink-0" aria-label={`${r.title} notifications`} />
+                                <input type="checkbox" role="switch" disabled={r.disabled} checked={!!form.data[r.key]} onChange={(e) => form.setData(r.key, e.target.checked)} className="mt-1 size-5 shrink-0" aria-label={`${r.title} notifications`} />
                             </label>
                         ))}
                         {!phone && (

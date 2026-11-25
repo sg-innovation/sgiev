@@ -43,6 +43,49 @@ class Ticket extends Model
         return 'uuid';
     }
 
+    /** Raised from the contact form by someone without an account. */
+    public function isGuest(): bool
+    {
+        return $this->requester_id === null && filled($this->guest_email);
+    }
+
+    public function requesterName(): string
+    {
+        return $this->requester?->name ?? $this->guest_name ?? 'Guest';
+    }
+
+    public function requesterEmail(): ?string
+    {
+        return $this->requester?->email ?? $this->guest_email;
+    }
+
+    public function requesterPhone(): ?string
+    {
+        return $this->requester?->phone ?? $this->guest_phone;
+    }
+
+    /** Whether a message was written by the requester (account holder or guest). */
+    public function isFromRequester(TicketMessage $m): bool
+    {
+        return $m->event === null && ($this->requester_id !== null ? $m->user_id === $this->requester_id : $m->user_id === null);
+    }
+
+    /** Private link for a guest to read and reply (signed; bump guest_link_version to cancel old links). */
+    public function guestUrl(string $route = 'support.guest.show', array $extra = []): string
+    {
+        return \Illuminate\Support\Facades\URL::signedRoute($route, ['ticket' => $this->uuid, 'v' => $this->guest_link_version ?? 1] + $extra);
+    }
+
+    /** Who to notify as the requester: the account, or the guest's email address. */
+    public function requesterNotifiable(): ?object
+    {
+        if ($this->requester) {
+            return $this->requester;
+        }
+
+        return $this->guest_email ? \Illuminate\Support\Facades\Notification::route('mail', [$this->guest_email => $this->guest_name]) : null;
+    }
+
     public function requester(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requester_id');

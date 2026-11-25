@@ -114,8 +114,10 @@ class TicketResource extends Resource
             ->columns([
                 TextColumn::make('subject')->searchable(['subject', 'number'])->weight('semibold')->wrap()->limit(70)
                     ->description(fn (Ticket $record) => $record->number.' · '.$record->category?->name),
-                TextColumn::make('requester.name')->label('From')
-                    ->description(fn (Ticket $record) => $record->requesterCompany?->trade_name ?? 'Customer'),
+                TextColumn::make('requester_label')->label('From')->state(fn (Ticket $record) => $record->requesterName())
+                    ->searchable(query: fn ($query, string $search) => $query->where(fn ($q) => $q->whereRelation('requester', 'name', 'like', "%{$search}%")
+                        ->orWhere('guest_name', 'like', "%{$search}%")->orWhere('guest_email', 'like', "%{$search}%")))
+                    ->description(fn (Ticket $record) => $record->isGuest() ? 'Guest' : ($record->requesterCompany?->trade_name ?? 'Customer')),
                 TextColumn::make('priority.name')->label('Priority')->badge()->color(fn (Ticket $record) => $record->priority?->color ?? 'gray'),
                 TextColumn::make('status')->badge()->formatStateUsing(fn (string $state) => Ticket::STATUSES[$state] ?? $state)
                     ->color(fn (string $state) => match ($state) { 'open' => 'info', 'in_progress' => 'primary', 'waiting_on_customer' => 'warning', 'resolved' => 'success', default => 'gray' }),

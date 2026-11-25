@@ -112,6 +112,86 @@ class DemoActivitySeeder extends Seeder
         }
 
         $this->command?->info("Created {$created} demo bookings (local only).");
+        $this->demoSessions();
+        $this->demoEnergyCosts();
+        $this->demoReviews();
+    }
+
+    /** G: completed demo bookings get a charging session with start/stop meter readings, so reports show energy. */
+    public function demoSessions(): void
+    {
+        $meters = [];
+        Booking::query()->where('status', BookingStatus::Completed)->whereNotExists(fn ($q) => $q->from('charging_sessions')->whereColumn('charging_sessions.booking_id', 'bookings.id'))->orderBy('start_at')->get()
+            ->each(function (Booking $b) use (&$meters) {
+                $start = $b->start_at->copy()->addMinutes(mt_rand(1, 9));
+                $stop = $b->end_at->copy()->subMinutes(mt_rand(0, 6));
+                $kwh = number_format((float) $b->est_kwh * mt_rand(82, 103) / 100, 3, '.', '');
+                $meterStart = $meters[$b->charger_id] ??= number_format(mt_rand(1200, 9000) + mt_rand(0, 999) / 1000, 3, '.', '');
+                $meterStop = bcadd($meterStart, $kwh, 3);
+                $meters[$b->charger_id] = bcadd($meterStop, number_format(mt_rand(0, 3000) / 1000, 3, '.', ''), 3);
+                $session = \App\Models\ChargingSession::query()->create([
+                    'uuid' => (string) Str::uuid(), 'company_id' => $b->company_id, 'station_id' => $b->station_id, 'charger_id' => $b->charger_id,
+                    'connector_id' => $b->connector_id, 'booking_id' => $b->id, 'source' => 'manual', 'status' => 'completed',
+                    'started_at' => $start, 'stopped_at' => $stop, 'meter_start_kwh' => $meterStart, 'meter_stop_kwh' => $meterStop,
+                    'energy_kwh' => $kwh, 'energy_source' => 'meter', 'stop_reason' => 'completed', 'note' => 'Demo session',
+                ]);
+                $session->meterValues()->createMany([
+                    ['measured_at' => $start, 'register_kwh' => $meterStart, 'energy_kwh' => '0', 'context' => 'start', 'source' => 'manual'],
+                    ['measured_at' => $stop, 'register_kwh' => $meterStop, 'energy_kwh' => $kwh, 'context' => 'stop', 'source' => 'manual'],
+                ]);
+                $b->forceFill(['checked_in_at' => $b->checked_in_at ?? $start->copy()->subMinutes(mt_rand(2, 10))])->save();
+            });
+    }
+
+    /** G: an electricity rate per station for the last few months, so reports can estimate gross profit. */
+    public function demoEnergyCosts(): void
+    {
+        $months = collect(range(0, 3))->map(fn ($i) => now(Station::TIMEZONE)->startOfMonth()->subMonthsNoOverflow($i)->toDateString());
+        Station::query()->get(['id', 'company_id'])->each(function (Station $s) use ($months) {
+            foreach ($months as $month) {
+                \App\Models\StationEnergyCost::query()->firstOrCreate(['station_id' => $s->id, 'month' => $month], [
+                    'company_id' => $s->company_id, 'cost_per_kwh' => number_format(mt_rand(720, 980) / 100, 4, '.', ''),
+                    'fixed_charges' => (string) (mt_rand(15, 60) * 100), 'note' => 'Demo DISCOM bill',
+                ]);
+            }
+        });
+    }
+
+    /** D3: ratings on about half the completed demo bookings, some with text and operator replies. */
+    private function demoReviews(): void
+    {
+        $bodies = [
+            5 => ['Smooth charge, charger was free right on time.', 'Clean station and helpful staff. Will come again.', 'Fast DC charging, got to 80% while I had coffee.'],
+            4 => ['Good experience overall, a little hard to find the entrance.', 'Charged fine. Parking was a bit tight.'],
+            3 => ['Charging was slower than the estimate.', 'Okay, but I had to wait a few minutes for check-in.'],
+            2 => ['One connector was faulty, staff moved me to another.'],
+            1 => ['Charger stopped halfway, needed a restart.'],
+        ];
+        $tags = array_keys(\App\Services\ReviewService::tags());
+        $svc = app(\App\Services\ReviewService::class);
+        $made = 0;
+        Booking::query()->where('status', BookingStatus::Completed)->whereNotNull('user_id')->whereDoesntHave('review')->inRandomOrder(2026)->get()
+            ->each(function (Booking $b) use ($bodies, $tags, $svc, &$made) {
+                if (mt_rand(1, 100) > 50) {
+                    return;
+                }
+                $stars = [5, 5, 5, 5, 4, 4, 4, 3, 3, 2, 1][mt_rand(0, 10)];
+                $text = mt_rand(1, 100) <= 45 ? $bodies[$stars][array_rand($bodies[$stars])] : null;
+                $r = \App\Models\Review::create([
+                    'booking_id' => $b->id, 'user_id' => $b->user_id, 'company_id' => $b->company_id, 'station_id' => $b->station_id, 'charger_id' => $b->charger_id,
+                    'station_rating' => $stars, 'charger_rating' => max(1, min(5, $stars + mt_rand(-1, 1))),
+                    'tags' => $tags ? array_values(array_slice($stars >= 4 ? array_slice($tags, 0, 6) : array_slice($tags, 6), 0, mt_rand(0, 2))) ?: null : null,
+                    'body' => $text, 'status' => 'published',
+                    'owner_reply' => $text && $stars <= 3 && mt_rand(0, 1) ? 'Thanks for telling us. We have checked the charger and briefed the team. Sorry for the trouble.' : null,
+                    'owner_replied_at' => null, 'created_at' => $b->end_at->copy()->addHours(mt_rand(1, 20)),
+                ]);
+                if ($r->owner_reply) {
+                    $r->forceFill(['owner_replied_at' => $r->created_at->copy()->addHours(5)])->save();
+                }
+                $svc->recalculate($r);
+                $made++;
+            });
+        $this->command?->info("Created {$made} demo reviews.");
     }
 
     /**

@@ -7,6 +7,9 @@ use App\Models\Payment;
 /** A payment gateway account of one operating company. */
 interface PaymentGateway
 {
+    /** Short gateway name stored on payments (sabpaisa, razorpay). */
+    public function name(): string;
+
     public function environment(): string;
 
     /**

@@ -29,7 +29,7 @@ class CompaniesTable
                 TextColumn::make('users_count')->label('Staff')->alignCenter(),
                 IconColumn::make('payments')->label('SabPaisa')->alignCenter()
                     ->state(fn (Company $record) => $record->hasPaymentSetup())->boolean()
-                    ->tooltip(fn (Company $record) => $record->hasPaymentSetup() ? 'Payments set up ('.$record->sabpaisa_env.')' : 'Payment account not connected: customers cannot pay for this company’s stations'),
+                    ->tooltip(fn (Company $record) => $record->hasPaymentSetup() ? 'Payments set up ('.($record->payment_gateway === 'razorpay' ? 'Razorpay '.(str_starts_with((string) $record->razorpay_key_id, 'rzp_live_') ? 'live' : 'test') : 'SabPaisa '.$record->sabpaisa_env).')' : 'Payment account not connected: customers cannot pay for this company’s stations'),
                 TextColumn::make('status')->badge()
                     ->formatStateUsing(fn (string $state) => Company::STATUSES[$state] ?? $state)
                     ->color(fn (string $state) => match ($state) { 'active' => 'success', 'pending' => 'warning', 'changes_requested' => 'info', default => 'danger' })

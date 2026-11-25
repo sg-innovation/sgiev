@@ -10,6 +10,18 @@ final class IndianNumber
 
     private const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
 
+    /** 1234567.5 → "12,34,567.50" (Indian digit grouping). */
+    public static function format(string|int|float|null $amount, int $decimals = 2): string
+    {
+        $n = number_format(abs((float) $amount), $decimals, '.', '');
+        [$int, $frac] = array_pad(explode('.', $n), 2, '');
+        if (strlen($int) > 3) {
+            $int = preg_replace('/\B(?=(\d{2})+(?!\d))/', ',', substr($int, 0, -3)).','.substr($int, -3);
+        }
+
+        return ((float) $amount < 0 && (float) $n > 0 ? '-' : '').$int.($decimals > 0 ? '.'.$frac : '');
+    }
+
     public static function rupeesInWords(string $amount): string
     {
         [$rupees, $paise] = array_pad(explode('.', number_format((float) $amount, 2, '.', '')), 2, '00');

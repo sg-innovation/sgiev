@@ -11,6 +11,13 @@ Route::middleware('auth')->group(function () {
 
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::get('settings/two-factor', [\App\Http\Controllers\Settings\TwoFactorController::class, 'edit'])->name('two-factor.edit');
+    Route::post('settings/two-factor/setup', [\App\Http\Controllers\Settings\TwoFactorController::class, 'setup'])->middleware('throttle:10,1')->name('two-factor.setup');
+    Route::post('settings/two-factor/confirm', [\App\Http\Controllers\Settings\TwoFactorController::class, 'confirm'])->middleware('throttle:10,1')->name('two-factor.confirm');
+    Route::post('settings/two-factor/recovery-codes', [\App\Http\Controllers\Settings\TwoFactorController::class, 'recoveryCodes'])->middleware('throttle:6,1')->name('two-factor.recovery-codes');
+    Route::delete('settings/two-factor', [\App\Http\Controllers\Settings\TwoFactorController::class, 'destroy'])->middleware('throttle:6,1')->name('two-factor.destroy');
+    Route::post('settings/profile/photo', [ProfileController::class, 'photo'])->middleware('throttle:10,1')->name('profile.photo');
+    Route::delete('settings/profile/photo', [ProfileController::class, 'removePhoto'])->name('profile.photo.remove');
     Route::delete('settings/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::get('settings/password', [PasswordController::class, 'edit'])->name('password.edit');

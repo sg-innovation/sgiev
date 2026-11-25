@@ -28,6 +28,11 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->login()
+            ->profile(isSimple: false)
+            ->multiFactorAuthentication(
+                [\Filament\Auth\MultiFactor\App\AppAuthentication::make()->recoverable()->brandName('Trans EV')],
+                isRequired: fn () => config('auth.staff_2fa_enforced', true) && \App\Support\BusinessRules::int('security.staff_2fa_required') === 1,
+            )
             ->brandName('Trans EV Admin')
             ->brandLogo(asset('brand/logo.svg'))
             ->darkModeBrandLogo(asset('brand/logo-dark.svg'))
@@ -44,6 +49,7 @@ class AdminPanelProvider extends PanelProvider
             ->navigationGroups([
                 NavigationGroup::make('Network'),
                 NavigationGroup::make('Bookings & Payments'),
+                NavigationGroup::make('Reports'),
                 NavigationGroup::make('Support'),
                 NavigationGroup::make('Content'),
                 NavigationGroup::make('Accounting'),
@@ -54,6 +60,8 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Dashboard::class,
             ])
+            // Search box at the top of the sidebar to find any menu item quickly.
+            ->renderHook(\Filament\View\PanelsRenderHook::SIDEBAR_NAV_START, fn () => view('filament.sidebar-search'))
             ->navigationItems([
                 \Filament\Navigation\NavigationItem::make('Staff console')->group('Bookings & Payments')->sort(1)
                     ->icon('heroicon-o-device-phone-mobile')->url(fn () => route('staff.console'), shouldOpenInNewTab: true)
