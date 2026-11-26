@@ -176,9 +176,82 @@ final class SiteContent
             'phone_label' => 'Call us (24×7 charging support)', 'whatsapp_label' => 'Chat on WhatsApp', 'email_label' => 'Email', 'office_label' => 'Registered office',
             'hours' => 'Office hours: Monday to Saturday, 9:30 AM – 6:30 PM IST. On-site charging help is available 24×7.',
         ]],
+        // ───────── Menu & footer (every public page) ─────────
+        'layout.menu' => ['page' => 'layout', 'label' => 'Top menu', 'fields' => ['items' => ['label' => 'text', 'url' => 'url', 'new_tab' => 'bool'], 'button_label' => 'text', 'button_url' => 'url'], 'default' => [
+            'items' => [
+                ['label' => 'Find stations', 'url' => '/stations', 'new_tab' => false],
+                ['label' => 'Pricing', 'url' => '/pricing', 'new_tab' => false],
+                ['label' => 'Blog', 'url' => '/blog', 'new_tab' => false],
+                ['label' => 'About', 'url' => '/about', 'new_tab' => false],
+                ['label' => 'Contact', 'url' => '/contact', 'new_tab' => false],
+            ],
+            'button_label' => 'Book a charge', 'button_url' => '/stations',
+        ]],
+        'layout.footer_columns' => ['page' => 'layout', 'label' => 'Footer link columns', 'fields' => ['items' => ['title' => 'text', 'links' => ['label' => 'text', 'url' => 'url', 'new_tab' => 'bool']]], 'default' => [
+            'items' => [
+                ['title' => 'Charging', 'links' => [
+                    ['label' => 'Find a station', 'url' => '/stations', 'new_tab' => false],
+                    ['label' => 'Pricing', 'url' => '/pricing', 'new_tab' => false],
+                    ['label' => 'Charging safety', 'url' => '/safety', 'new_tab' => false],
+                    ['label' => 'Blog', 'url' => '/blog', 'new_tab' => false],
+                    ['label' => 'List your station', 'url' => '/partner', 'new_tab' => false],
+                    ['label' => 'Become a franchise partner', 'url' => '/franchise', 'new_tab' => false],
+                    ['label' => 'Create account', 'url' => '/register', 'new_tab' => false],
+                ]],
+                ['title' => 'Company', 'links' => [
+                    ['label' => 'About us', 'url' => '/about', 'new_tab' => false],
+                    ['label' => 'Contact', 'url' => '/contact', 'new_tab' => false],
+                    ['label' => 'Terms of service', 'url' => '/terms', 'new_tab' => false],
+                    ['label' => 'Privacy policy', 'url' => '/privacy', 'new_tab' => false],
+                    ['label' => 'Refund & cancellation', 'url' => '/refund-policy', 'new_tab' => false],
+                ]],
+            ],
+        ]],
+        'layout.footer' => ['page' => 'layout', 'label' => 'Footer text', 'fields' => ['text' => 'textarea', 'contact_title' => 'text', 'bottom_line' => 'text'], 'default' => [
+            'text' => 'Fast, reliable EV charging across India. Find a charger, book your slot and pay online in under a minute.',
+            'contact_title' => 'Get in touch',
+            'bottom_line' => 'Prices include applicable GST at checkout',
+        ]],
     ];
 
-    public const PAGES = ['home' => 'Homepage', 'about' => 'About us', 'pricing' => 'Pricing', 'safety' => 'Charging safety', 'contact' => 'Contact'];
+    public const PAGES = ['home' => 'Homepage', 'about' => 'About us', 'pricing' => 'Pricing', 'safety' => 'Charging safety', 'contact' => 'Contact', 'layout' => 'Menu & footer'];
+
+    /**
+     * Menu and footer for every public page. Links keep only safe addresses (a site path, http(s), mailto: or tel:)
+     * and drop rows without a label, so a typo in admin can never break the layout or inject a script link.
+     */
+    public static function layout(): array
+    {
+        $links = fn (array $rows) => collect($rows)
+            ->map(fn ($r) => ['label' => trim((string) ($r['label'] ?? '')), 'url' => self::safeUrl($r['url'] ?? null), 'newTab' => (bool) ($r['new_tab'] ?? false)])
+            ->filter(fn ($r) => $r['label'] !== '' && $r['url'] !== null)->values()->all();
+        $menu = self::get('layout.menu');
+        $footer = self::get('layout.footer');
+
+        return [
+            'menu' => $links($menu['items'] ?? []),
+            'button' => ($label = trim((string) ($menu['button_label'] ?? ''))) !== '' && ($url = self::safeUrl($menu['button_url'] ?? null)) ? ['label' => $label, 'url' => $url] : null,
+            'columns' => collect(self::get('layout.footer_columns')['items'] ?? [])
+                ->map(fn ($c) => ['title' => trim((string) ($c['title'] ?? '')), 'links' => $links($c['links'] ?? [])])
+                ->filter(fn ($c) => $c['links'] !== [])->values()->all(),
+            'footerText' => $footer['text'] ?? null,
+            'contactTitle' => $footer['contact_title'] ?? null,
+            'bottomLine' => $footer['bottom_line'] ?? null,
+        ];
+    }
+
+    public static function safeUrl(mixed $url): ?string
+    {
+        $url = trim((string) $url);
+        if ($url === '') {
+            return null;
+        }
+        if (str_starts_with($url, '/') && ! str_starts_with($url, '//')) {
+            return $url;
+        }
+
+        return preg_match('#^(https?://[^\s]+|mailto:[^\s]+|tel:[+\d\s-]+)$#i', $url) ? $url : null;
+    }
 
     /** @var array<string, array>|null */
     private static ?array $cache = null;

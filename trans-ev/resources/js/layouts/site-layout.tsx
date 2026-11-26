@@ -1,18 +1,24 @@
 import SocialIcons from '@/components/site/social-icons';
 import { useAppearance } from '@/hooks/use-appearance';
 import { cn } from '@/lib/utils';
-import { type SharedData } from '@/types';
+import { type SharedData, type SiteLink } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { Mail, MapPin, Menu, Moon, Phone, Sun, X } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 
-const NAV = [
-    { label: 'Find stations', href: '/stations' },
-    { label: 'Pricing', href: '/pricing' },
-    { label: 'Blog', href: '/blog' },
-    { label: 'About', href: '/about' },
-    { label: 'Contact', href: '/contact' },
-];
+/** A menu or footer link from Admin → Content → Site content → Menu & footer. Site pages use Inertia; others open normally. */
+function SiteAnchor({ link, className, onClick, children }: { link: Pick<SiteLink, 'url'> & { newTab?: boolean }; className?: string; onClick?: () => void; children: ReactNode }) {
+    const internal = link.url.startsWith('/') && !link.newTab;
+    if (internal) {
+        return <Link href={link.url} className={className} onClick={onClick}>{children}</Link>;
+    }
+
+    return (
+        <a href={link.url} className={className} onClick={onClick} {...(link.newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+            {children}
+        </a>
+    );
+}
 
 function ThemeToggle() {
     const { appearance, updateAppearance } = useAppearance();
@@ -31,7 +37,7 @@ function ThemeToggle() {
 }
 
 export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
-    const { auth, url } = { ...usePage<SharedData>().props, url: usePage().url };
+    const { auth, layout, url } = { ...usePage<SharedData>().props, url: usePage().url };
     const [open, setOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
 
@@ -58,17 +64,17 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
                 </Link>
 
                 <nav className="hidden items-center gap-1 md:flex">
-                    {NAV.map((item) => (
-                        <Link
-                            key={item.href}
-                            href={item.href}
+                    {layout.menu.map((item, i) => (
+                        <SiteAnchor
+                            key={i}
+                            link={item}
                             className={cn(
                                 'rounded-full px-4 py-2 text-sm font-medium text-foreground/70 transition hover:bg-foreground/5 hover:text-foreground',
-                                url.startsWith(item.href) && 'bg-foreground/5 text-foreground',
+                                item.url.length > 1 && url.startsWith(item.url) && 'bg-foreground/5 text-foreground',
                             )}
                         >
                             {item.label}
-                        </Link>
+                        </SiteAnchor>
                     ))}
                 </nav>
 
@@ -83,12 +89,14 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
                             Log in
                         </Link>
                     )}
-                    <Link
-                        href="/stations"
-                        className="rounded-full bg-gradient-to-r from-volt to-electric px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-volt/25 transition hover:shadow-volt/40 hover:brightness-110"
-                    >
-                        Book a charge
-                    </Link>
+                    {layout.button && (
+                        <SiteAnchor
+                            link={layout.button}
+                            className="rounded-full bg-gradient-to-r from-volt to-electric px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-volt/25 transition hover:shadow-volt/40 hover:brightness-110"
+                        >
+                            {layout.button.label}
+                        </SiteAnchor>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-1 md:hidden">
@@ -101,18 +109,20 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
 
             {open && (
                 <nav className="max-h-[calc(100svh-4rem)] overflow-y-auto border-t border-border/60 bg-background px-4 pb-6 text-foreground shadow-lg md:hidden [&_a]:text-foreground" aria-label="Menu">
-                    {NAV.map((item) => (
-                        <Link key={item.href} href={item.href} className="block border-b border-border/40 py-3 text-base font-medium" onClick={() => setOpen(false)}>
+                    {layout.menu.map((item, i) => (
+                        <SiteAnchor key={i} link={item} className="block border-b border-border/40 py-3 text-base font-medium" onClick={() => setOpen(false)}>
                             {item.label}
-                        </Link>
+                        </SiteAnchor>
                     ))}
                     <div className="mt-4 flex gap-3">
                         <Link href={auth.user ? (auth.isStaff ? '/admin' : '/dashboard') : route('login')} className="flex-1 rounded-full border border-border py-2.5 text-center text-sm font-medium">
                             {auth.user ? 'My account' : 'Log in'}
                         </Link>
-                        <Link href="/stations" className="flex-1 rounded-full bg-gradient-to-r from-volt to-electric py-2.5 text-center text-sm font-semibold text-white">
-                            Book a charge
-                        </Link>
+                        {layout.button && (
+                            <SiteAnchor link={layout.button} className="flex-1 rounded-full bg-gradient-to-r from-volt to-electric py-2.5 text-center text-sm font-semibold text-white" onClick={() => setOpen(false)}>
+                                {layout.button.label}
+                            </SiteAnchor>
+                        )}
                     </div>
                 </nav>
             )}
@@ -121,47 +131,34 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
 }
 
 export function SiteFooter() {
-    const { brand } = usePage<SharedData>().props;
+    const { brand, layout } = usePage<SharedData>().props;
     const year = new Date().getFullYear();
 
     return (
         <footer className="relative overflow-hidden bg-ink text-white">
             <div className="pointer-events-none absolute -top-40 left-1/2 h-80 w-[60rem] -translate-x-1/2 rounded-full bg-gradient-to-r from-volt/20 to-electric/20 blur-3xl" />
-            <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-8">
+            <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-2 lg:auto-cols-fr lg:grid-flow-col lg:grid-cols-none lg:px-8">
                 <div className="space-y-4">
                     <img src="/brand/logo-dark.svg" alt="Trans EV" className="h-10" />
-                    <p className="max-w-xs text-sm text-white/60">
-                        Fast, reliable EV charging across India. Find a charger, book your slot and pay online in under a minute.
-                    </p>
+                    {layout.footerText && <p className="max-w-xs text-sm text-white/60">{layout.footerText}</p>}
                     <SocialIcons links={brand.social} />
                 </div>
 
-                <div>
-                    <h3 className="font-display text-sm font-semibold tracking-wide text-white/90 uppercase">Charging</h3>
-                    <ul className="mt-4 space-y-2.5 text-sm text-white/60">
-                        <li><Link href="/stations" className="hover:text-volt">Find a station</Link></li>
-                        <li><Link href="/pricing" className="hover:text-volt">Pricing</Link></li>
-                        <li><Link href="/safety" className="hover:text-volt">Charging safety</Link></li>
-                        <li><Link href="/blog" className="hover:text-volt">Blog</Link></li>
-                        <li><Link href="/partner" className="hover:text-volt">List your station</Link></li>
-                        <li><Link href="/franchise" className="hover:text-volt">Become a franchise partner</Link></li>
-                        <li><Link href={route('register')} className="hover:text-volt">Create account</Link></li>
-                    </ul>
-                </div>
+                {layout.columns.map((col, i) => (
+                    <div key={i}>
+                        {col.title && <h3 className="font-display text-sm font-semibold tracking-wide text-white/90 uppercase">{col.title}</h3>}
+                        <ul className="mt-4 space-y-2.5 text-sm text-white/60">
+                            {col.links.map((link, j) => (
+                                <li key={j}>
+                                    <SiteAnchor link={link} className="hover:text-volt">{link.label}</SiteAnchor>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                ))}
 
                 <div>
-                    <h3 className="font-display text-sm font-semibold tracking-wide text-white/90 uppercase">Company</h3>
-                    <ul className="mt-4 space-y-2.5 text-sm text-white/60">
-                        <li><Link href="/about" className="hover:text-volt">About us</Link></li>
-                        <li><Link href="/contact" className="hover:text-volt">Contact</Link></li>
-                        <li><Link href="/terms" className="hover:text-volt">Terms of service</Link></li>
-                        <li><Link href="/privacy" className="hover:text-volt">Privacy policy</Link></li>
-                        <li><Link href="/refund-policy" className="hover:text-volt">Refund &amp; cancellation</Link></li>
-                    </ul>
-                </div>
-
-                <div>
-                    <h3 className="font-display text-sm font-semibold tracking-wide text-white/90 uppercase">Get in touch</h3>
+                    <h3 className="font-display text-sm font-semibold tracking-wide text-white/90 uppercase">{layout.contactTitle || 'Get in touch'}</h3>
                     <ul className="mt-4 space-y-3 text-sm text-white/60">
                         {brand.address && (
                             <li className="flex gap-2.5"><MapPin className="mt-0.5 size-4 shrink-0 text-volt" />{brand.address}</li>
@@ -178,7 +175,7 @@ export function SiteFooter() {
             <div className="relative border-t border-white/10">
                 <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-5 text-xs text-white/50 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
                     <p>© {year} {brand.legalName ?? 'Trans EV'}. All rights reserved.</p>
-                    <p>transevrecharge.com · Prices include applicable GST at checkout</p>
+                    {layout.bottomLine && <p>{layout.bottomLine}</p>}
                 </div>
             </div>
         </footer>

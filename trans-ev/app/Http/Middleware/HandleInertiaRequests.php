@@ -58,6 +58,7 @@ class HandleInertiaRequests extends Middleware
                 'whatsapp' => $company?->social_links['whatsapp'] ?? null,
                 'social' => $company?->social_links ?? [],
             ],
+            'layout' => fn () => \App\Support\SiteContent::layout(),
         ]);
     }
 }

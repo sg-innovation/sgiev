@@ -11,6 +11,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
@@ -77,6 +78,14 @@ class SiteContentPage extends Page
         }
 
         return match ($type) {
+            'bool' => Toggle::make($name)->label($name === 'new_tab' ? 'Open in a new tab' : $label)->inline(false),
+            'url' => TextInput::make($name)->label($name === 'url' ? 'Link' : $label)->maxLength(500)
+                ->placeholder('/about or https://…')->helperText('A page on this site (/pricing) or a full address (https://…, mailto:, tel:).')
+                ->rule(fn () => function (string $attribute, $value, \Closure $fail) {
+                    if (filled($value) && SiteContent::safeUrl($value) === null) {
+                        $fail('Use a site path starting with / or a full https://, mailto: or tel: address.');
+                    }
+                }),
             'textarea' => Textarea::make($name)->label($label)->rows(3)->maxLength(1000)->columnSpanFull(),
             'list' => TagsInput::make($name)->label($label)->columnSpanFull()->reorderable(),
             'icon' => Select::make($name)->label('Icon')->options(SiteContent::ICONS)->searchable(),

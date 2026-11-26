@@ -33,11 +33,27 @@ export interface Brand {
     social: Partial<Record<'facebook' | 'instagram' | 'x' | 'linkedin' | 'youtube' | 'whatsapp', string>>;
 }
 
+export interface SiteLink {
+    label: string;
+    url: string;
+    newTab: boolean;
+}
+
+export interface SiteLayout {
+    menu: SiteLink[];
+    button: { label: string; url: string } | null;
+    columns: { title: string; links: SiteLink[] }[];
+    footerText: string | null;
+    contactTitle: string | null;
+    bottomLine: string | null;
+}
+
 export interface SharedData {
     name: string;
     quote?: { message: string; author: string };
     auth: Auth;
     brand: Brand;
+    layout: SiteLayout;
     [key: string]: unknown;
 }
 
